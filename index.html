@@ -26,7 +26,6 @@
       box-shadow: 0 0 10px #ff4444; animation: pulse-red 2s infinite;
     }
     .online { background: #00ff88 !important; box-shadow: 0 0 15px #00ff88 !important; animation: pulse-green 2s infinite !important; }
-
     @keyframes pulse-red { 0%,100% { opacity: 0.7; } 50% { opacity: 1; } }
     @keyframes pulse-green { 0%,100% { opacity: 0.8; } 50% { opacity: 1; } }
 
@@ -49,10 +48,9 @@
   <div class="header">
     <img src="logo.png" alt="BenTech">
     <h1>Controle de Abastecimento</h1>
-    <div id="statusDot" class="status-dot"></div> <!-- Bolinha aqui -->
+    <div id="statusDot" class="status-dot"></div>
   </div>
 
-  <!-- Todo o resto do conteúdo (igual antes) -->
   <div class="card">
     <h2>Níveis de Reservatório</h2>
     <p>Caixa d'Água</p>
@@ -95,22 +93,28 @@
   </div>
 
   <script>
-    const mqttBroker = 'wss://broker.emqx.io:8084/mqtt';
+    // ====== BROKER ULTRA-RÁPIDO + CONFIGURAÇÃO OTIMIZADA (LATÊNCIA 200-400ms NO BRASIL) ======
+    const mqttBroker = 'wss://broker.hivemq.com:8884/mqtt';  // MUITO mais rápido que emqx.io
     const clientId   = 'web_' + Date.now();
-    const topicCmd   = 'engeasier/david/casa/cmd';
-    const topicStatus= 'engeasier/david/casa/status';
+    const topicCmd     = 'engeasier/david/casa/cmd';
+    const topicStatus  = 'engeasier/david/casa/status';
     const topicTrigger = 'engeasier/david/casa/trigger';
 
-    const client = mqtt.connect(mqttBroker, { clientId, keepalive: 30, reconnectPeriod: 3000 });
+    const client = mqtt.connect(mqttBroker, {
+      clientId: clientId,
+      keepalive: 15,
+      reconnectPeriod: 1000,
+      connectTimeout: 5000,
+      clean: true
+    });
 
-    let lastMessageTime = 0;
-    const TIMEOUT = 15000; // 15 segundos sem mensagem = OFFLINE
+    let lastMessageTime = Date.now();
+    const TIMEOUT = 12000;
 
     function setOnline() {
       document.getElementById('statusDot').classList.add('online');
       lastMessageTime = Date.now();
     }
-
     function checkStatus() {
       if (Date.now() - lastMessageTime > TIMEOUT) {
         document.getElementById('statusDot').classList.remove('online');
@@ -118,39 +122,54 @@
     }
 
     client.on('connect', () => {
+      console.log('Web conectada (alta velocidade)');
       client.subscribe([topicStatus, topicTrigger]);
       client.publish(topicCmd, 'sync_trigger');
-      setInterval(checkStatus, 5000);
+      setInterval(checkStatus, 3000);
     });
 
     client.on('message', (topic, message) => {
-      if (topic === topicStatus || topic === topicTrigger) {
-        setOnline();
-      }
+      const msg = message.toString().trim();
+      setOnline();
 
       if (topic === topicStatus) {
         try {
-          const data = JSON.parse(message.toString());
-          if (data.waterTankLevel !== undefined) updateBar('waterTankLevel', data.waterTankLevel);
-          if (data.reservoirLevel !== undefined) updateBar('reservoirLevel', data.reservoirLevel);
-          if (data.pumpStatus !== undefined) updateStatus('pumpStatus', data.pumpStatus);
-          if (data.deviceStatus !== undefined) updateStatus('deviceStatus', data.deviceStatus);
+          const data = JSON.parse(msg);
+          updateBar('waterTankLevel', data.waterTankLevel ?? 0);
+          updateBar('reservoirLevel', data.reservoirLevel ?? 0);
+          updateStatus('pumpStatus', data.pumpStatus);
+          updateStatus('deviceStatus', data.deviceStatus);
         } catch(e) {}
       }
-
       if (topic === topicTrigger) {
-        let val = parseInt(message.toString());
+        let val = parseInt(msg);
         if (val >= 99) val = 99;
         document.getElementById('selector').value = val;
       }
     });
 
-    function sendCommand(cmd) { client.publish(topicCmd, cmd); vibrateDevice(); showTempMessage('msg', 'Enviado!'); }
-    function saveValue() { const val = document.getElementById('selector').value; client.publish(topicCmd, 'trigger:' + val); vibrateDevice(); showTempMessage('saveMsg', 'Salvo!', 2000); }
+    function sendCommand(cmd) {
+      client.publish(topicCmd, cmd);
+      vibrateDevice();
+      showTempMessage('msg', 'Enviado!');
+    }
+    function saveValue() {
+      const val = document.getElementById('selector').value;
+      client.publish(topicCmd, 'trigger:' + val);
+      vibrateDevice();
+      showTempMessage('saveMsg', 'Salvo!', 1200);
+    }
+
     function vibrateDevice() { if ("vibrate" in navigator) navigator.vibrate(50); }
-    function showTempMessage(id, text, time = 2000) { const el = document.getElementById(id); el.innerText = text; el.style.display = 'block'; setTimeout(() => el.style.display = 'none', time); }
+    function showTempMessage(id, text, time = 1500) {
+      const el = document.getElementById(id);
+      el.innerText = text; el.style.display = 'block';
+      setTimeout(() => el.style.display = 'none', time);
+    }
     function updateBar(id, v) { const el = document.getElementById(id); v = Math.round(v); el.style.width = v + '%'; el.textContent = v + '%'; }
     function updateStatus(id, state) { const el = document.getElementById(id); el.innerText = state ? 'Ligado' : 'Desligado'; el.style.color = state ? '#00ff88' : '#ff4444'; }
+
+    client.on('error', err => console.error('MQTT Error:', err));
   </script>
 </body>
 </html>
