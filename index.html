@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Controle de Abastecimento</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <style>
+    /* === TODO O SEU CSS ORIGINAL (mantido 100% igual) === */
+    html, body { height: 100%; margin: 0; padding: 0; background-color: #000; overflow-x: hidden; }
+    body {
+      font-family: Arial, sans-serif; color: #fff; text-align: center;
+      background: linear-gradient(rgba(0,0,0,0.70), rgba(0,0,0,0.70)), url('/bg.jpg') center top/cover no-repeat;
+      background-attachment: scroll; transform: translateZ(0); will-change: background-position;
+    }
+    body::before {
+      content: ""; position: fixed; top: -50%; left: 0; height: 200%;
+      background: url('/bg.jpg') center/cover no-repeat;
+      background-attachment: fixed; z-index: -1; pointer-events: none;
+    }
+    @supports (-webkit-touch-callout: none) { html, body { height: -webkit-fill-available; } }
+
+    .header { display: flex; align-items: center; justify-content: center; background: rgba(17,17,17,0.9);
+      padding: 10px 15px; margin: 15px auto; border-radius: 10px; width: 90%; max-width: 405px; }
+    .header img { width: 40px; height: 40px; margin-right: 10px; }
+    h1 { color: #fff; font-size: 20px; margin: 0; }
+    .card { background: rgba(51,51,51,0.7); padding: 20px; margin: 15px auto; border-radius: 15px;
+      width: 90%; max-width: 400px; }
+    .button { display: inline-block; padding: 15px 25px; margin: 10px; border: none; border-radius: 10px;
+      font-size: 18px; cursor: pointer; width: 40%; max-width: 200px; transition: all 0.2s; }
+    .on { background: #00ff88; color: #000; }
+    .on:active { background: #00cc66; transform: scale(0.97); }
+    .off { background: #ff4444; color: #fff; }
+    .off:active { background: #cc3333; transform: scale(0.97); }
+    select { padding: 10px; font-size: 16px; border-radius: 8px; margin-right: 10px; }
+    #msg, #saveMsg { margin-top: 10px; font-size: 16px; color: #fff; display: none; }
+    .bar { background: #555; border-radius: 10px; overflow: hidden; margin: 10px auto;
+      height: 25px; width: 90%; max-width: 400px; }
+    .fill { background: #00aaff; height: 100%; width: 0%; text-align: center; line-height: 25px;
+      color: #fff; transition: width 0.5s ease; }
+    .status-text { font-size: 18px; margin-top: 5px; }
+    .inline-group { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+    @media (min-width: 800px) {
+      .card { width: 50%; max-width: 400px; }
+      .header img { width: 50px; height: 50px; }
+      h1 { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <img src="logo.png" alt="Logo BenTech">
+    <h1>Controle de Abastecimento</h1>
+  </div>
+
+  <!-- Níveis -->
+  <div class="card">
+    <h2>Níveis de Reservatório</h2>
+    <p>Caixa d'Água</p>
+    <div class="bar"><div id="waterTankLevel" class="fill">0%</div></div>
+    <p>Reservatório</p>
+    <div class="bar"><div id="reservoirLevel" class="fill">0%</div></div>
+  </div>
+
+  <p>Obs: O reservatório precisa estar acima<br>de 25% para acionamento automático</p>
+
+  <!-- Bomba Automática -->
+  <div class="card">
+    <h2>Bomba Automática</h2>
+    <p>Nível da Caixa D'água para Acionamento</p>
+    <div class="inline-group">
+      <select id="selector">
+        <option value="0">0%</option>
+        <option value="25">25%</option>
+        <option value="50">50%</option>
+        <option value="75">75%</option>
+        <option value="99">OFF</option>
+      </select>
+      <button class="button on" onclick="saveValue()">Salvar</button>
+    </div>
+    <p id="saveMsg" class="status-text"></p>
+  </div>
+
+  <!-- Bomba Manual -->
+  <div class="card">
+    <h2>Bomba Manual</h2>
+    <button class="button on" onclick="sendCommand('pump/on')">Ligar</button>
+    <button class="button off" onclick="sendCommand('pump/off')">Desligar</button>
+    <p id="msg" class="status-text"></p>
+    <p id="pumpStatus" class="status-text" style="color:#ff4444">Desligado</p>
+  </div>
+
+  <!-- Dispositivo Paralelo -->
+  <div class="card">
+    <h2>Dispositivo Paralelo</h2>
+    <button class="button on" onclick="sendCommand('device/on')">Ligar</button>
+    <button class="button off" onclick="sendCommand('device/off')">Desligar</button>
+    <p id="deviceStatus" class="status-text" style="color:#ff4444">Desligado</p>
+  </div>
+
+  <script>
+    // ==================== CONFIGURAÇÃO MQTT ====================
+    const mqttBroker = 'wss://broker.emqx.io:8084/mqtt';
+    const clientId = 'web_' + Math.random().toString(16).substr(2, 8);
+    
+    // Tópicos MQTT (ajuste conforme seu ESP8266/ESP32)
+    const topicCommand   = 'casa/abastecimento/cmd';     // para enviar comandos
+    const topicStatus    = 'casa/abastecimento/status';  // recebe status JSON
+    const topicTrigger   = 'casa/abastecimento/trigger'; // nível automático salvo
+
+    const client = mqtt.connect(mqttBroker, {
+      clientId: clientId,
+      keepalive: 60,
+      reconnectPeriod: 5000
+    });
+
+    // ==================== FUNÇÕES AUXILIARES ====================
+    function vibrateDevice() {
+      if ("vibrate" in navigator) navigator.vibrate(50);
+    }
+
+    function showTempMessage(id, text, time = 2000) {
+      const el = document.getElementById(id);
+      el.innerText = text;
+      el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; el.innerText = ''; }, time);
+    }
+
+    function updateBar(id, value) {
+      const el = document.getElementById(id);
+      value = Math.round(value);
+      el.style.width = value + '%';
+      el.textContent = value + '%';
+    }
+
+    function updateStatus(id, state) {
+      const el = document.getElementById(id);
+      el.innerText = state ? 'Ligado' : 'Desligado';
+      el.style.color = state ? '#00ff88' : '#ff4444';
+    }
+
+    // ==================== ENVIO DE COMANDOS ====================
+    function sendCommand(command) {
+      vibrateDevice();
+      client.publish(topicCommand, command);
+      showTempMessage('msg', 'Comando enviado: ' + command);
+    }
+
+    function saveValue() {
+      vibrateDevice();
+      const val = document.getElementById('selector').value;
+      client.publish(topicCommand, 'trigger:' + val);
+      showTempMessage('saveMsg', 'Nível automático salvo!', 2000);
+    }
+
+    // ==================== CONEXÃO E SUBSCRIÇÃO ====================
+    client.on('connect', () => {
+      console.log('MQTT conectado:', clientId);
+      client.subscribe(topicStatus);
+      client.subscribe(topicTrigger);
+      // Opcional: pedir estado atual ao conectar
+      client.publish(topicCommand, 'getStatus');
+    });
+
+    client.on('error', (err) => console.error('MQTT Error:', err));
+    client.on('offline', () => console.log('MQTT offline'));
+    client.on('reconnect', () => console.log('Tentando reconectar...'));
+
+    // ==================== RECEPÇÃO DE MENSAGENS ====================
+    client.on('message', (topic, message) => {
+      const msg = message.toString();
+
+      if (topic === topicStatus) {
+        try {
+          const data = JSON.parse(msg);
+          if (data.waterTankLevel !== undefined) updateBar('waterTankLevel', data.waterTankLevel);
+          if (data.reservoirLevel !== undefined) updateBar('reservoirLevel', data.reservoirLevel);
+          if (data.pumpStatus !== undefined) updateStatus('pumpStatus', data.pumpStatus);
+          if (data.deviceStatus !== undefined) updateStatus('deviceStatus', data.deviceStatus);
+        } catch (e) {
+          console.error('Erro ao parsear JSON:', e);
+        }
+      }
+
+      if (topic === topicTrigger) {
+        let val = parseInt(msg);
+        if (val >= 99) val = 99;
+        document.getElementById('selector').value = val;
+      }
+    });
+  </script>
+</body>
+</html>
