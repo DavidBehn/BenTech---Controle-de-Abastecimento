@@ -101,19 +101,36 @@
 
   <script>
     // ==================== CONFIGURAÇÃO MQTT ====================
-    const mqttBroker = 'wss://broker.emqx.io:8084/mqtt';
-    const clientId = 'web_' + Math.random().toString(16).substr(2, 8);
-    
-    // Tópicos MQTT (ajuste conforme seu ESP8266/ESP32)
-    const topicCommand   = 'casa/abastecimento/cmd';     // para enviar comandos
-    const topicStatus    = 'casa/abastecimento/status';  // recebe status JSON
-    const topicTrigger   = 'casa/abastecimento/trigger'; // nível automático salvo
+  
+const mqttBroker = 'wss://broker.emqx.io:8083/mqtt';   // PORTA 8083 = a única que funciona 100% no GitHub Pages hoje
+const clientId   = 'web_' + Math.floor(Math.random() * 1000000);
 
-    const client = mqtt.connect(mqttBroker, {
-      clientId: clientId,
-      keepalive: 60,
-      reconnectPeriod: 5000
-    });
+// Tópicos que seu ESP32 está usando (tem que bater exatamente!)
+const topicCommand  = 'engeasier/casa/cmd';
+const topicStatus   = 'engeasier/casa/status';
+const topicTrigger  = 'engeasier/casa/trigger';
+
+const client = mqtt.connect(mqttBroker, {
+  clientId: clientId,
+  keepalive: 30,
+  reconnectPeriod: 3000,
+  clean: true
+});
+
+// Mensagens de debug (você vai ver no console do navegador)
+client.on('connect', () => {
+  console.log('MQTT conectado com sucesso! ClientID:', clientId);
+  client.subscribe(topicStatus);
+  client.subscribe(topicTrigger);
+});
+
+client.on('error', (err) => {
+  console.error('Erro MQTT:', err);
+});
+
+client.on('offline', () => {
+  console.log('MQTT desconectado – tentando reconectar...');
+});
 
     // ==================== FUNÇÕES AUXILIARES ====================
     function vibrateDevice() {
