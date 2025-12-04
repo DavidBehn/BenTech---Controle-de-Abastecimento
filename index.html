@@ -8,17 +8,19 @@
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <style>
     html, body { height: 100%; margin: 0; padding: 0; background-color: #000; overflow-x: hidden; }
-    body {
-      font-family: Arial, sans-serif; color: #fff; text-align: center;
-      background: linear-gradient(rgba(0,0,0,0.70), rgba(0,0,0,0.70)), url('bg.jpg') center top/cover no-repeat fixed;
-      background-attachment: fixed;
-    }
-    body::before { content: ""; position: fixed; top: -50%; left: 0; height: 200%; background: url('bg.jpg') center/cover no-repeat fixed; background-attachment: fixed; z-index: -1; }
+    body { font-family: Arial, sans-serif; color: #fff; text-align: center;
+      background: linear-gradient(rgba(0,0,0,0.70), rgba(0,0,0,0.70)), url('bg.jpg') center top/cover no-repeat fixed; }
+    body::before { content: ""; position: fixed; top: -50%; left: 0; height: 200%; background: url('bg.jpg') center/cover no-repeat fixed; z-index: -1; }
     @supports (-webkit-touch-callout: none) { html, body { height: -webkit-fill-available; } }
 
     .header { display: flex; align-items: center; justify-content: center; background: rgba(17,17,17,0.9); padding: 10px 15px; margin: 15px auto; border-radius: 10px; width: 90%; max-width: 405px; }
     .header img { width: 40px; height: 40px; margin-right: 10px; }
     h1 { font-size: 20px; margin: 0; }
+
+    .status-esp { position: fixed; top: 10px; right: 10px; padding: 8px 15px; border-radius: 20px; font-size: 14px; font-weight: bold; z-index: 999; transition: all 0.4s; }
+    .online { background: #00ff88; color: #000; }
+    .offline { background: #ff4444; color: #fff; }
+
     .card { background: rgba(51,51,51,0.7); padding: 20px; margin: 15px auto; border-radius: 15px; width: 90%; max-width: 400px; }
     .button { display: inline-block; padding: 15px 25px; margin: 10px; border: none; border-radius: 10px; font-size: 18px; cursor: pointer; width: 40%; max-width: 200px; transition: all 0.2s; }
     .on { background: #00ff88; color: #000; }
@@ -34,11 +36,16 @@
   </style>
 </head>
 <body>
+
+  <!-- INDICADOR DE STATUS DO ESP32 -->
+  <div id="espStatus" class="status-esp offline">ESP32 OFFLINE</div>
+
   <div class="header">
     <img src="logo.png" alt="BenTech">
     <h1>Controle de Abastecimento</h1>
   </div>
 
+  <!-- resto do seu conteúdo igual -->
   <div class="card">
     <h2>Níveis de Reservatório</h2>
     <p>Caixa d'Água</p>
@@ -89,17 +96,35 @@
 
     const client = mqtt.connect(mqttBroker, { clientId, keepalive: 30, reconnectPeriod: 3000 });
 
+    let lastMessageTime = 0;
+    const TIMEOUT = 15000; // 15 segundos sem mensagem = OFFLINE
+
+    function setEspOnline() {
+      const el = document.getElementById('espStatus');
+      el.textContent = 'ESP32 ONLINE';
+      el.className = 'status-esp online';
+      lastMessageTime = Date.now();
+    }
+
+    function checkConnection() {
+      if (Date.now() - lastMessageTime > TIMEOUT) {
+        document.getElementById('espStatus').textContent = 'ESP32 OFFLINE';
+        document.getElementById('espStatus').className = 'status-esp offline';
+      }
+    }
+
     client.on('connect', () => {
-      console.log('Conectado ao MQTT!');
+      console.log('Web conectada ao broker');
       client.subscribe([topicStatus, topicTrigger]);
-      // Força o ESP32 a reenviar o triggerLevel imediatamente
       client.publish(topicCmd, 'sync_trigger');
+      setInterval(checkConnection, 5000); // checa a cada 5s
     });
 
     client.on('message', (topic, message) => {
       const msg = message.toString().trim();
 
       if (topic === topicStatus) {
+        setEspOnline(); // toda vez que chega status → ESP32 está vivo!
         try {
           const data = JSON.parse(msg);
           if (data.waterTankLevel !== undefined) updateBar('waterTankLevel', data.waterTankLevel);
@@ -110,36 +135,20 @@
       }
 
       if (topic === topicTrigger) {
+        setEspOnline(); // trigger também conta como "vivo"
         let val = parseInt(msg);
         if (val >= 99) val = 99;
         document.getElementById('selector').value = val;
-        console.log('TriggerLevel sincronizado:', val === 99 ? 'OFF' : val + '%');
       }
     });
 
-    function sendCommand(cmd) {
-      client.publish(topicCmd, cmd);
-      vibrateDevice();
-      showTempMessage('msg', 'Enviado!');
-    }
-
-    function saveValue() {
-      const val = document.getElementById('selector').value;
-      client.publish(topicCmd, 'trigger:' + val);
-      vibrateDevice();
-      showTempMessage('saveMsg', 'Salvo!', 2000);
-    }
-
+    // Funções auxiliares (iguais)
+    function sendCommand(cmd) { client.publish(topicCmd, cmd); vibrateDevice(); showTempMessage('msg', 'Enviado!'); }
+    function saveValue() { const val = document.getElementById('selector').value; client.publish(topicCmd, 'trigger:' + val); vibrateDevice(); showTempMessage('saveMsg', 'Salvo!', 2000); }
     function vibrateDevice() { if ("vibrate" in navigator) navigator.vibrate(50); }
-    function showTempMessage(id, text, time = 2000) {
-      const el = document.getElementById(id);
-      el.innerText = text; el.style.display = 'block';
-      setTimeout(() => el.style.display = 'none', time);
-    }
+    function showTempMessage(id, text, time = 2000) { const el = document.getElementById(id); el.innerText = text; el.style.display = 'block'; setTimeout(() => el.style.display = 'none', time); }
     function updateBar(id, v) { const el = document.getElementById(id); v = Math.round(v); el.style.width = v + '%'; el.textContent = v + '%'; }
     function updateStatus(id, state) { const el = document.getElementById(id); el.innerText = state ? 'Ligado' : 'Desligado'; el.style.color = state ? '#00ff88' : '#ff4444'; }
-
-    client.on('error', err => console.error('MQTT Error:', err));
   </script>
 </body>
 </html>
