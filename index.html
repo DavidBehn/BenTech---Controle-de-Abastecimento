@@ -85,8 +85,8 @@
   <!-- Bomba Manual -->
   <div class="card">
     <h2>Bomba Manual</h2>
-    <button class="button on" onclick="sendCommand('pump/on')">Ligar</button>
-    <button class="button off" onclick="sendCommand('pump/off')">Desligar</button>
+    <button class="button on" onclick="sendCommand('pump:on')">Ligar</button>  <!-- Corrigido: : em vez de / -->
+    <button class="button off" onclick="sendCommand('pump:off')">Desligar</button>  <!-- Corrigido: : em vez de / -->
     <p id="msg" class="status-text"></p>
     <p id="pumpStatus" class="status-text" style="color:#ff4444">Desligado</p>
   </div>
@@ -94,42 +94,44 @@
   <!-- Dispositivo Paralelo -->
   <div class="card">
     <h2>Dispositivo Paralelo</h2>
-    <button class="button on" onclick="sendCommand('device/on')">Ligar</button>
-    <button class="button off" onclick="sendCommand('device/off')">Desligar</button>
+    <button class="button on" onclick="sendCommand('device:on')">Ligar</button>
+    <button class="button off" onclick="sendCommand('device:off')">Desligar</button>
     <p id="deviceStatus" class="status-text" style="color:#ff4444">Desligado</p>
   </div>
 
   <script>
-    // ==================== CONFIGURAÇÃO MQTT – 100% FUNCIONAL DEZEMBRO 2025 ====================
-const mqttBroker = 'wss://broker.emqx.io:8083/mqtt';   // PORTA 8083 = a única que funciona 100% no GitHub Pages hoje
-const clientId   = 'web_' + Math.floor(Math.random() * 1000000);
+    // ==================== CONFIGURAÇÃO MQTT – CORRIGIDA PARA WSS/8084 (DEZEMBRO 2025) ====================
+    const mqttBroker = 'wss://broker.emqx.io:8084/mqtt';  // CORREÇÃO: Porta 8084 para WSS + path /mqtt
+    const clientId   = 'web_' + Math.floor(Math.random() * 1000000);
 
-// Tópicos que seu ESP32 está usando (tem que bater exatamente!)
-const topicCommand  = 'engeasier/david/casa/cmd';
-const topicStatus   = 'engeasier/david/casa/status';
-const topicTrigger  = 'engeasier/david/casa/trigger';
+    // Tópicos que seu ESP32 está usando (tem que bater exatamente!)
+    const topicCommand  = 'engeasier/david/casa/cmd';
+    const topicStatus   = 'engeasier/david/casa/status';
+    const topicTrigger  = 'engeasier/david/casa/trigger';
 
-const client = mqtt.connect(mqttBroker, {
-  clientId: clientId,
-  keepalive: 30,
-  reconnectPeriod: 3000,
-  clean: true
-});
+    const client = mqtt.connect(mqttBroker, {
+      clientId: clientId,
+      keepalive: 30,
+      reconnectPeriod: 3000,
+      clean: true
+    });
 
-// Mensagens de debug (você vai ver no console do navegador)
-client.on('connect', () => {
-  console.log('MQTT conectado com sucesso! ClientID:', clientId);
-  client.subscribe(topicStatus);
-  client.subscribe(topicTrigger);
-});
+    // Mensagens de debug (você vai ver no console do navegador)
+    client.on('connect', () => {
+      console.log('MQTT conectado com sucesso! ClientID:', clientId);
+      client.subscribe(topicStatus);
+      client.subscribe(topicTrigger);
+      // Opcional: pedir estado atual ao conectar
+      client.publish(topicCommand, 'getStatus');  // Adicionei isso para forçar ESP32 a responder (se implementado)
+    });
 
-client.on('error', (err) => {
-  console.error('Erro MQTT:', err);
-});
+    client.on('error', (err) => {
+      console.error('Erro MQTT:', err);
+    });
 
-client.on('offline', () => {
-  console.log('MQTT desconectado – tentando reconectar...');
-});
+    client.on('offline', () => {
+      console.log('MQTT desconectado – tentando reconectar...');
+    });
 
     // ==================== FUNÇÕES AUXILIARES ====================
     function vibrateDevice() {
@@ -166,22 +168,9 @@ client.on('offline', () => {
     function saveValue() {
       vibrateDevice();
       const val = document.getElementById('selector').value;
-      client.publish(topicCommand, 'trigger:' + val);
+      client.publish(topicCommand, 'trigger:' + val);  // CORREÇÃO: Usa topicCommand para bater com ESP32
       showTempMessage('saveMsg', 'Nível automático salvo!', 2000);
     }
-
-    // ==================== CONEXÃO E SUBSCRIÇÃO ====================
-    client.on('connect', () => {
-      console.log('MQTT conectado:', clientId);
-      client.subscribe(topicStatus);
-      client.subscribe(topicTrigger);
-      // Opcional: pedir estado atual ao conectar
-      client.publish(topicCommand, 'getStatus');
-    });
-
-    client.on('error', (err) => console.error('MQTT Error:', err));
-    client.on('offline', () => console.log('MQTT offline'));
-    client.on('reconnect', () => console.log('Tentando reconectar...'));
 
     // ==================== RECEPÇÃO DE MENSAGENS ====================
     client.on('message', (topic, message) => {
@@ -194,6 +183,7 @@ client.on('offline', () => {
           if (data.reservoirLevel !== undefined) updateBar('reservoirLevel', data.reservoirLevel);
           if (data.pumpStatus !== undefined) updateStatus('pumpStatus', data.pumpStatus);
           if (data.deviceStatus !== undefined) updateStatus('deviceStatus', data.deviceStatus);
+          if (data.Msg) showTempMessage('msg', data.Msg);  // Para mensagens de erro do ESP32
         } catch (e) {
           console.error('Erro ao parsear JSON:', e);
         }
