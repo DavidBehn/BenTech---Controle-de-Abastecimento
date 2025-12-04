@@ -2,59 +2,43 @@
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8">
-  <title>Controle de Abastecimento</title>
+  <title>Controle de Abastecimento - BenTech</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <style>
-    /* === TODO O SEU CSS ORIGINAL (mantido 100% igual) === */
     html, body { height: 100%; margin: 0; padding: 0; background-color: #000; overflow-x: hidden; }
     body {
       font-family: Arial, sans-serif; color: #fff; text-align: center;
-      background: linear-gradient(rgba(0,0,0,0.70), rgba(0,0,0,0.70)), url('/bg.jpg') center top/cover no-repeat;
-      background-attachment: scroll; transform: translateZ(0); will-change: background-position;
+      background: linear-gradient(rgba(0,0,0,0.70), rgba(0,0,0,0.70)), url('bg.jpg') center top/cover no-repeat fixed;
+      background-attachment: fixed;
     }
-    body::before {
-      content: ""; position: fixed; top: -50%; left: 0; height: 200%;
-      background: url('/bg.jpg') center/cover no-repeat;
-      background-attachment: fixed; z-index: -1; pointer-events: none;
-    }
+    body::before { content: ""; position: fixed; top: -50%; left: 0; height: 200%; background: url('bg.jpg') center/cover no-repeat fixed; background-attachment: fixed; z-index: -1; }
     @supports (-webkit-touch-callout: none) { html, body { height: -webkit-fill-available; } }
 
-    .header { display: flex; align-items: center; justify-content: center; background: rgba(17,17,17,0.9);
-      padding: 10px 15px; margin: 15px auto; border-radius: 10px; width: 90%; max-width: 405px; }
+    .header { display: flex; align-items: center; justify-content: center; background: rgba(17,17,17,0.9); padding: 10px 15px; margin: 15px auto; border-radius: 10px; width: 90%; max-width: 405px; }
     .header img { width: 40px; height: 40px; margin-right: 10px; }
-    h1 { color: #fff; font-size: 20px; margin: 0; }
-    .card { background: rgba(51,51,51,0.7); padding: 20px; margin: 15px auto; border-radius: 15px;
-      width: 90%; max-width: 400px; }
-    .button { display: inline-block; padding: 15px 25px; margin: 10px; border: none; border-radius: 10px;
-      font-size: 18px; cursor: pointer; width: 40%; max-width: 200px; transition: all 0.2s; }
+    h1 { font-size: 20px; margin: 0; }
+    .card { background: rgba(51,51,51,0.7); padding: 20px; margin: 15px auto; border-radius: 15px; width: 90%; max-width: 400px; }
+    .button { display: inline-block; padding: 15px 25px; margin: 10px; border: none; border-radius: 10px; font-size: 18px; cursor: pointer; width: 40%; max-width: 200px; transition: all 0.2s; }
     .on { background: #00ff88; color: #000; }
     .on:active { background: #00cc66; transform: scale(0.97); }
     .off { background: #ff4444; color: #fff; }
     .off:active { background: #cc3333; transform: scale(0.97); }
-    select { padding: 10px; font-size: 16px; border-radius: 8px; margin-right: 10px; }
+    select { padding: 10px; font-size: 16px; border-radius: 8px; margin-right: 10px; width: 120px; }
     #msg, #saveMsg { margin-top: 10px; font-size: 16px; color: #fff; display: none; }
-    .bar { background: #555; border-radius: 10px; overflow: hidden; margin: 10px auto;
-      height: 25px; width: 90%; max-width: 400px; }
-    .fill { background: #00aaff; height: 100%; width: 0%; text-align: center; line-height: 25px;
-      color: #fff; transition: width 0.5s ease; }
+    .bar { background: #555; border-radius: 10px; overflow: hidden; margin: 10px auto; height: 25px; width: 90%; max-width: 400px; }
+    .fill { background: #00aaff; height: 100%; width: 0%; text-align: center; line-height: 25px; color: #fff; transition: width 0.5s ease; }
     .status-text { font-size: 18px; margin-top: 5px; }
     .inline-group { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; margin-top: 10px; }
-    @media (min-width: 800px) {
-      .card { width: 50%; max-width: 400px; }
-      .header img { width: 50px; height: 50px; }
-      h1 { font-size: 24px; }
-    }
   </style>
 </head>
 <body>
   <div class="header">
-    <img src="logo.png" alt="Logo BenTech">
+    <img src="logo.png" alt="BenTech">
     <h1>Controle de Abastecimento</h1>
   </div>
 
-  <!-- Níveis -->
   <div class="card">
     <h2>Níveis de Reservatório</h2>
     <p>Caixa d'Água</p>
@@ -63,12 +47,11 @@
     <div class="bar"><div id="reservoirLevel" class="fill">0%</div></div>
   </div>
 
-  <p>Obs: O reservatório precisa estar acima<br>de 25% para acionamento automático</p>
+  <p>Obs: Reservatório acima de 25% para acionamento automático</p>
 
-  <!-- Bomba Automática -->
   <div class="card">
     <h2>Bomba Automática</h2>
-    <p>Nível da Caixa D'água para Acionamento</p>
+    <p>Nível para ligar automaticamente</p>
     <div class="inline-group">
       <select id="selector">
         <option value="0">0%</option>
@@ -82,16 +65,14 @@
     <p id="saveMsg" class="status-text"></p>
   </div>
 
-  <!-- Bomba Manual -->
   <div class="card">
     <h2>Bomba Manual</h2>
-    <button class="button on" onclick="sendCommand('pump:on')">Ligar</button>  <!-- Corrigido: : em vez de / -->
-    <button class="button off" onclick="sendCommand('pump:off')">Desligar</button>  <!-- Corrigido: : em vez de / -->
+    <button class="button on" onclick="sendCommand('pump:on')">Ligar</button>
+    <button class="button off" onclick="sendCommand('pump:off')">Desligar</button>
     <p id="msg" class="status-text"></p>
     <p id="pumpStatus" class="status-text" style="color:#ff4444">Desligado</p>
   </div>
 
-  <!-- Dispositivo Paralelo -->
   <div class="card">
     <h2>Dispositivo Paralelo</h2>
     <button class="button on" onclick="sendCommand('device:on')">Ligar</button>
@@ -100,89 +81,65 @@
   </div>
 
   <script>
-    // ==================== CONFIGURAÇÃO MQTT – CORRIGIDA PARA WSS/8084 (DEZEMBRO 2025) ====================
     const mqttBroker = 'wss://broker.emqx.io:8084/mqtt';
-  const clientId   = 'web_' + Math.floor(Math.random() * 1000000);
+    const clientId   = 'web_' + Date.now();
+    const topicCmd   = 'engeasier/david/casa/cmd';
+    const topicStatus= 'engeasier/david/casa/status';
+    const topicTrigger = 'engeasier/david/casa/trigger';
 
-  const topicCommand = 'engeasier/david/casa/cmd';
-  const topicStatus  = 'engeasier/david/casa/status';
-  const topicTrigger = 'engeasier/david/casa/trigger';
+    const client = mqtt.connect(mqttBroker, { clientId, keepalive: 30, reconnectPeriod: 3000 });
 
-  const client = mqtt.connect(mqttBroker, {
-    clientId: clientId,
-    keepalive: 30,
-    reconnectPeriod: 3000,
-    clean: true
-  });
+    client.on('connect', () => {
+      console.log('Conectado ao MQTT!');
+      client.subscribe([topicStatus, topicTrigger]);
+      // Força o ESP32 a reenviar o triggerLevel imediatamente
+      client.publish(topicCmd, 'sync_trigger');
+    });
 
-  client.on('connect', () => {
-    console.log('MQTT Web conectado!');
-    client.subscribe(topicStatus);
-    client.subscribe(topicTrigger);
-    // Força o ESP32 a reenviar o triggerLevel ao conectar
-    client.publish(topicCommand, 'sync'); // pode ser qualquer mensagem que o ESP32 ignore
-  });
+    client.on('message', (topic, message) => {
+      const msg = message.toString().trim();
 
-  client.on('message', (topic, message) => {
-    const msg = message.toString().trim();
+      if (topic === topicStatus) {
+        try {
+          const data = JSON.parse(msg);
+          if (data.waterTankLevel !== undefined) updateBar('waterTankLevel', data.waterTankLevel);
+          if (data.reservoirLevel !== undefined) updateBar('reservoirLevel', data.reservoirLevel);
+          if (data.pumpStatus !== undefined) updateStatus('pumpStatus', data.pumpStatus);
+          if (data.deviceStatus !== undefined) updateStatus('deviceStatus', data.deviceStatus);
+        } catch(e) {}
+      }
 
-    if (topic === topicStatus) {
-      try {
-        const data = JSON.parse(msg);
-        if (data.waterTankLevel !== undefined) updateBar('waterTankLevel', data.waterTankLevel);
-        if (data.reservoirLevel !== undefined) updateBar('reservoirLevel', data.reservoirLevel);
-        if (data.pumpStatus !== undefined) updateStatus('pumpStatus', data.pumpStatus);
-        if (data.deviceStatus !== undefined) updateStatus('deviceStatus', data.deviceStatus);
-      } catch (e) { console.error('JSON inválido:', msg); }
+      if (topic === topicTrigger) {
+        let val = parseInt(msg);
+        if (val >= 99) val = 99;
+        document.getElementById('selector').value = val;
+        console.log('TriggerLevel sincronizado:', val === 99 ? 'OFF' : val + '%');
+      }
+    });
+
+    function sendCommand(cmd) {
+      client.publish(topicCmd, cmd);
+      vibrateDevice();
+      showTempMessage('msg', 'Enviado!');
     }
 
-    if (topic === topicTrigger) {
-      let val = parseInt(msg);
-      if (isNaN(val)) val = 25; // fallback
-      if (val >= 99) val = 99;
-      document.getElementById('selector').value = val;
-      console.log('TriggerLevel sincronizado:', val == 99 ? 'OFF' : val + '%');
+    function saveValue() {
+      const val = document.getElementById('selector').value;
+      client.publish(topicCmd, 'trigger:' + val);
+      vibrateDevice();
+      showTempMessage('saveMsg', 'Salvo!', 2000);
     }
-  });
 
-  function sendCommand(cmd) {
-    vibrateDevice();
-    client.publish(topicCommand, cmd);
-    showTempMessage('msg', 'Enviado: ' + cmd);
-  }
+    function vibrateDevice() { if ("vibrate" in navigator) navigator.vibrate(50); }
+    function showTempMessage(id, text, time = 2000) {
+      const el = document.getElementById(id);
+      el.innerText = text; el.style.display = 'block';
+      setTimeout(() => el.style.display = 'none', time);
+    }
+    function updateBar(id, v) { const el = document.getElementById(id); v = Math.round(v); el.style.width = v + '%'; el.textContent = v + '%'; }
+    function updateStatus(id, state) { const el = document.getElementById(id); el.innerText = state ? 'Ligado' : 'Desligado'; el.style.color = state ? '#00ff88' : '#ff4444'; }
 
-  function saveValue() {
-    vibrateDevice();
-    const val = document.getElementById('selector').value;
-    client.publish(topicCommand, 'trigger:' + val);
-    showTempMessage('saveMsg', 'Salvo!', 2000);
-  }
-
-  function vibrateDevice() {
-    if ("vibrate" in navigator) navigator.vibrate(50);
-  }
-
-  function showTempMessage(id, text, time = 2000) {
-    const el = document.getElementById(id);
-    el.innerText = text;
-    el.style.display = 'block';
-    setTimeout(() => { el.style.display = 'none'; }, time);
-  }
-
-  function updateBar(id, value) {
-    const el = document.getElementById(id);
-    value = Math.round(value);
-    el.style.width = value + '%';
-    el.textContent = value + '%';
-  }
-
-  function updateStatus(id, state) {
-    document.getElementById(id).innerText = state ? 'Ligado' : 'Desligado';
-    document.getElementById(id).style.color = state ? '#00ff88' : '#ff4444';
-  }
-
-  client.on('error', (err) => console.error('MQTT Error:', err));
-  client.on('offline', () => console.log('MQTT offline'));
-</script>
+    client.on('error', err => console.error('MQTT Error:', err));
+  </script>
 </body>
 </html>
