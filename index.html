@@ -66,21 +66,21 @@
   <p>Obs: O reservatório precisa estar acima<br>de 25% para acionamento automático</p>
 
   <!-- Bomba Automática -->
-<div class="card">
-  <h2>Bomba Automática</h2>
-  <p>Nível da Caixa D'água para Acionamento</p>
-  <div class="inline-group">
-    <select id="selector">
-      <option value="0">0%</option>
-      <option value="25">25%</option>
-      <option value="50">50%</option>
-      <option value="75">75%</option>
-      <option value="99">OFF</option>
-    </select>
-    <button class="button on" onclick="saveValue()">Salvar</button>
+  <div class="card">
+    <h2>Bomba Automática</h2>
+    <p>Nível da Caixa D'água para Acionamento</p>
+    <div class="inline-group">
+      <select id="selector">
+        <option value="0">0%</option>
+        <option value="25">25%</option>
+        <option value="50">50%</option>
+        <option value="75">75%</option>
+        <option value="99">OFF</option>
+      </select>
+      <button class="button on" onclick="saveValue()">Salvar</button>
+    </div>
+    <p id="saveMsg" class="status-text"></p>
   </div>
-  <p id="saveMsg" class="status-text"></p>
-</div>
 
   <!-- Bomba Manual -->
   <div class="card">
@@ -101,100 +101,88 @@
 
   <script>
     // ==================== CONFIGURAÇÃO MQTT – CORRIGIDA PARA WSS/8084 (DEZEMBRO 2025) ====================
-    const mqttBroker = 'wss://broker.emqx.io:8084/mqtt';  // CORREÇÃO: Porta 8084 para WSS + path /mqtt
-    const clientId   = 'web_' + Math.floor(Math.random() * 1000000);
+    const mqttBroker = 'wss://broker.emqx.io:8084/mqtt';
+  const clientId   = 'web_' + Math.floor(Math.random() * 1000000);
 
-    // Tópicos que seu ESP32 está usando (tem que bater exatamente!)
-    const topicCommand  = 'engeasier/david/casa/cmd';
-    const topicStatus   = 'engeasier/david/casa/status';
-    const topicTrigger  = 'engeasier/david/casa/trigger';
+  const topicCommand = 'engeasier/david/casa/cmd';
+  const topicStatus  = 'engeasier/david/casa/status';
+  const topicTrigger = 'engeasier/david/casa/trigger';
 
-    const client = mqtt.connect(mqttBroker, {
-      clientId: clientId,
-      keepalive: 30,
-      reconnectPeriod: 3000,
-      clean: true
-    });
+  const client = mqtt.connect(mqttBroker, {
+    clientId: clientId,
+    keepalive: 30,
+    reconnectPeriod: 3000,
+    clean: true
+  });
 
-    // Mensagens de debug (você vai ver no console do navegador)
-    client.on('connect', () => {
-      console.log('MQTT conectado com sucesso! ClientID:', clientId);
-      client.subscribe(topicStatus);
-      client.subscribe(topicTrigger);
-      // Opcional: pedir estado atual ao conectar
-      client.publish(topicCommand, 'getStatus');  // Adicionei isso para forçar ESP32 a responder (se implementado)
-    });
+  client.on('connect', () => {
+    console.log('MQTT Web conectado!');
+    client.subscribe(topicStatus);
+    client.subscribe(topicTrigger);
+    // Força o ESP32 a reenviar o triggerLevel ao conectar
+    client.publish(topicCommand, 'sync'); // pode ser qualquer mensagem que o ESP32 ignore
+  });
 
-    client.on('error', (err) => {
-      console.error('Erro MQTT:', err);
-    });
+  client.on('message', (topic, message) => {
+    const msg = message.toString().trim();
 
-    client.on('offline', () => {
-      console.log('MQTT desconectado – tentando reconectar...');
-    });
-
-    // ==================== FUNÇÕES AUXILIARES ====================
-    function vibrateDevice() {
-      if ("vibrate" in navigator) navigator.vibrate(50);
+    if (topic === topicStatus) {
+      try {
+        const data = JSON.parse(msg);
+        if (data.waterTankLevel !== undefined) updateBar('waterTankLevel', data.waterTankLevel);
+        if (data.reservoirLevel !== undefined) updateBar('reservoirLevel', data.reservoirLevel);
+        if (data.pumpStatus !== undefined) updateStatus('pumpStatus', data.pumpStatus);
+        if (data.deviceStatus !== undefined) updateStatus('deviceStatus', data.deviceStatus);
+      } catch (e) { console.error('JSON inválido:', msg); }
     }
 
-    function showTempMessage(id, text, time = 2000) {
-      const el = document.getElementById(id);
-      el.innerText = text;
-      el.style.display = 'block';
-      setTimeout(() => { el.style.display = 'none'; el.innerText = ''; }, time);
+    if (topic === topicTrigger) {
+      let val = parseInt(msg);
+      if (isNaN(val)) val = 25; // fallback
+      if (val >= 99) val = 99;
+      document.getElementById('selector').value = val;
+      console.log('TriggerLevel sincronizado:', val == 99 ? 'OFF' : val + '%');
     }
+  });
 
-    function updateBar(id, value) {
-      const el = document.getElementById(id);
-      value = Math.round(value);
-      el.style.width = value + '%';
-      el.textContent = value + '%';
-    }
+  function sendCommand(cmd) {
+    vibrateDevice();
+    client.publish(topicCommand, cmd);
+    showTempMessage('msg', 'Enviado: ' + cmd);
+  }
 
-    function updateStatus(id, state) {
-      const el = document.getElementById(id);
-      el.innerText = state ? 'Ligado' : 'Desligado';
-      el.style.color = state ? '#00ff88' : '#ff4444';
-    }
+  function saveValue() {
+    vibrateDevice();
+    const val = document.getElementById('selector').value;
+    client.publish(topicCommand, 'trigger:' + val);
+    showTempMessage('saveMsg', 'Salvo!', 2000);
+  }
 
-    // ==================== ENVIO DE COMANDOS ====================
-    function sendCommand(command) {
-      vibrateDevice();
-      client.publish(topicCommand, command);
-      showTempMessage('msg', 'Comando enviado: ' + command);
-    }
+  function vibrateDevice() {
+    if ("vibrate" in navigator) navigator.vibrate(50);
+  }
 
-    function saveValue() {
-      vibrateDevice();
-      const val = document.getElementById('selector').value;
-      client.publish(topicCommand, 'trigger:' + val);  // CORREÇÃO: Usa topicCommand para bater com ESP32
-      showTempMessage('saveMsg', 'Nível automático salvo!', 2000);
-    }
+  function showTempMessage(id, text, time = 2000) {
+    const el = document.getElementById(id);
+    el.innerText = text;
+    el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, time);
+  }
 
-    // ==================== RECEPÇÃO DE MENSAGENS ====================
-    client.on('message', (topic, message) => {
-      const msg = message.toString();
+  function updateBar(id, value) {
+    const el = document.getElementById(id);
+    value = Math.round(value);
+    el.style.width = value + '%';
+    el.textContent = value + '%';
+  }
 
-      if (topic === topicStatus) {
-        try {
-          const data = JSON.parse(msg);
-          if (data.waterTankLevel !== undefined) updateBar('waterTankLevel', data.waterTankLevel);
-          if (data.reservoirLevel !== undefined) updateBar('reservoirLevel', data.reservoirLevel);
-          if (data.pumpStatus !== undefined) updateStatus('pumpStatus', data.pumpStatus);
-          if (data.deviceStatus !== undefined) updateStatus('deviceStatus', data.deviceStatus);
-          if (data.Msg) showTempMessage('msg', data.Msg);  // Para mensagens de erro do ESP32
-        } catch (e) {
-          console.error('Erro ao parsear JSON:', e);
-        }
-      }
+  function updateStatus(id, state) {
+    document.getElementById(id).innerText = state ? 'Ligado' : 'Desligado';
+    document.getElementById(id).style.color = state ? '#00ff88' : '#ff4444';
+  }
 
-      if (topic === topicTrigger) {
-        let val = parseInt(msg);
-        if (val >= 99) val = 99;
-        document.getElementById('selector').value = val;
-      }
-    });
-  </script>
+  client.on('error', (err) => console.error('MQTT Error:', err));
+  client.on('offline', () => console.log('MQTT offline'));
+</script>
 </body>
 </html>
