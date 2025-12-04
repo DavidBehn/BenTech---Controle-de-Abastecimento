@@ -105,9 +105,9 @@ const mqttBroker = 'wss://broker.emqx.io:8083/mqtt';   // PORTA 8083 = a única 
 const clientId   = 'web_' + Math.floor(Math.random() * 1000000);
 
 // Tópicos que seu ESP32 está usando (tem que bater exatamente!)
-const topicCommand  = 'engeasier/casa/cmd';
-const topicStatus   = 'engeasier/casa/status';
-const topicTrigger  = 'engeasier/casa/trigger';
+const topicCommand  = 'engeasier/david/casa/cmd';
+const topicStatus   = 'engeasier/david/casa/status';
+const topicTrigger  = 'engeasier/david/casa/trigger';
 
 const client = mqtt.connect(mqttBroker, {
   clientId: clientId,
