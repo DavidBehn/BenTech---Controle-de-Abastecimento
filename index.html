@@ -13,13 +13,22 @@
     body::before { content: ""; position: fixed; top: -50%; left: 0; height: 200%; background: url('bg.jpg') center/cover no-repeat fixed; z-index: -1; }
     @supports (-webkit-touch-callout: none) { html, body { height: -webkit-fill-available; } }
 
-    .header { display: flex; align-items: center; justify-content: center; background: rgba(17,17,17,0.9); padding: 10px 15px; margin: 15px auto; border-radius: 10px; width: 90%; max-width: 405px; }
-    .header img { width: 40px; height: 40px; margin-right: 10px; }
+    .header {
+      display: flex; align-items: center; justify-content: center; background: rgba(17,17,17,0.9);
+      padding: 10px 15px; margin: 15px auto; border-radius: 10px; width: 90%; max-width: 405px; gap: 12px;
+    }
+    .header img { width: 40px; height: 40px; }
     h1 { font-size: 20px; margin: 0; }
 
-    .status-esp { position: fixed; top: 10px; right: 10px; padding: 8px 15px; border-radius: 20px; font-size: 14px; font-weight: bold; z-index: 999; transition: all 0.4s; }
-    .online { background: #00ff88; color: #000; }
-    .offline { background: #ff4444; color: #fff; }
+    /* BOLINHA DE STATUS */
+    .status-dot {
+      width: 14px; height: 14px; border-radius: 50%; background: #ff4444;
+      box-shadow: 0 0 10px #ff4444; animation: pulse-red 2s infinite;
+    }
+    .online { background: #00ff88 !important; box-shadow: 0 0 15px #00ff88 !important; animation: pulse-green 2s infinite !important; }
+
+    @keyframes pulse-red { 0%,100% { opacity: 0.7; } 50% { opacity: 1; } }
+    @keyframes pulse-green { 0%,100% { opacity: 0.8; } 50% { opacity: 1; } }
 
     .card { background: rgba(51,51,51,0.7); padding: 20px; margin: 15px auto; border-radius: 15px; width: 90%; max-width: 400px; }
     .button { display: inline-block; padding: 15px 25px; margin: 10px; border: none; border-radius: 10px; font-size: 18px; cursor: pointer; width: 40%; max-width: 200px; transition: all 0.2s; }
@@ -37,15 +46,13 @@
 </head>
 <body>
 
-  <!-- INDICADOR DE STATUS DO ESP32 -->
-  <div id="espStatus" class="status-esp offline">ESP32 OFFLINE</div>
-
   <div class="header">
     <img src="logo.png" alt="BenTech">
     <h1>Controle de Abastecimento</h1>
+    <div id="statusDot" class="status-dot"></div> <!-- Bolinha aqui -->
   </div>
 
-  <!-- resto do seu conteúdo igual -->
+  <!-- Todo o resto do conteúdo (igual antes) -->
   <div class="card">
     <h2>Níveis de Reservatório</h2>
     <p>Caixa d'Água</p>
@@ -99,34 +106,31 @@
     let lastMessageTime = 0;
     const TIMEOUT = 15000; // 15 segundos sem mensagem = OFFLINE
 
-    function setEspOnline() {
-      const el = document.getElementById('espStatus');
-      el.textContent = 'ESP32 ONLINE';
-      el.className = 'status-esp online';
+    function setOnline() {
+      document.getElementById('statusDot').classList.add('online');
       lastMessageTime = Date.now();
     }
 
-    function checkConnection() {
+    function checkStatus() {
       if (Date.now() - lastMessageTime > TIMEOUT) {
-        document.getElementById('espStatus').textContent = 'ESP32 OFFLINE';
-        document.getElementById('espStatus').className = 'status-esp offline';
+        document.getElementById('statusDot').classList.remove('online');
       }
     }
 
     client.on('connect', () => {
-      console.log('Web conectada ao broker');
       client.subscribe([topicStatus, topicTrigger]);
       client.publish(topicCmd, 'sync_trigger');
-      setInterval(checkConnection, 5000); // checa a cada 5s
+      setInterval(checkStatus, 5000);
     });
 
     client.on('message', (topic, message) => {
-      const msg = message.toString().trim();
+      if (topic === topicStatus || topic === topicTrigger) {
+        setOnline();
+      }
 
       if (topic === topicStatus) {
-        setEspOnline(); // toda vez que chega status → ESP32 está vivo!
         try {
-          const data = JSON.parse(msg);
+          const data = JSON.parse(message.toString());
           if (data.waterTankLevel !== undefined) updateBar('waterTankLevel', data.waterTankLevel);
           if (data.reservoirLevel !== undefined) updateBar('reservoirLevel', data.reservoirLevel);
           if (data.pumpStatus !== undefined) updateStatus('pumpStatus', data.pumpStatus);
@@ -135,14 +139,12 @@
       }
 
       if (topic === topicTrigger) {
-        setEspOnline(); // trigger também conta como "vivo"
-        let val = parseInt(msg);
+        let val = parseInt(message.toString());
         if (val >= 99) val = 99;
         document.getElementById('selector').value = val;
       }
     });
 
-    // Funções auxiliares (iguais)
     function sendCommand(cmd) { client.publish(topicCmd, cmd); vibrateDevice(); showTempMessage('msg', 'Enviado!'); }
     function saveValue() { const val = document.getElementById('selector').value; client.publish(topicCmd, 'trigger:' + val); vibrateDevice(); showTempMessage('saveMsg', 'Salvo!', 2000); }
     function vibrateDevice() { if ("vibrate" in navigator) navigator.vibrate(50); }
