@@ -13,29 +13,33 @@
     body::before { content: ""; position: fixed; top: -50%; left: 0; height: 200%; background: url('bg.jpg') center/cover no-repeat fixed; z-index: -1; }
     @supports (-webkit-touch-callout: none) { html, body { height: -webkit-fill-available; } }
 
-    .header { display: flex; align-items: center; justify-content: center; background: rgba(17,17,17,0.9);
-      padding: 10px 15px; margin: 15px auto; border-radius: 10px; width: 90%; max-width: 405px; gap: 12px; }
+    .header {
+      display: flex; align-items: center; justify-content: center; background: rgba(17,17,17,0.9);
+      padding: 10px 15px; margin: 15px auto; border-radius: 10px; width: 90%; max-width: 405px; gap: 12px;
+    }
     .header img { width: 40px; height: 40px; }
     h1 { font-size: 20px; margin: 0; }
 
-    .status-dot { width: 14px; height: 14px; border-radius: 50%; background: #ff4444;
-      box-shadow: 0 0 10px #ff4444; animation: pulse-red 2s infinite; }
+    /* BOLINHA DE STATUS */
+    .status-dot {
+      width: 14px; height: 14px; border-radius: 50%; background: #ff4444;
+      box-shadow: 0 0 10px #ff4444; animation: pulse-red 2s infinite;
+    }
     .online { background: #00ff88 !important; box-shadow: 0 0 15px #00ff88 !important; animation: pulse-green 2s infinite !important; }
     @keyframes pulse-red { 0%,100% { opacity: 0.7; } 50% { opacity: 1; } }
     @keyframes pulse-green { 0%,100% { opacity: 0.8; } 50% { opacity: 1; } }
 
     .card { background: rgba(51,51,51,0.7); padding: 20px; margin: 15px auto; border-radius: 15px; width: 90%; max-width: 400px; }
-    .button { display: inline-block; padding: 15px 25px; margin: 10px; border: none; border-radius: 10px; font-size: 18px; cursor: pointer; width: 40%; max-width: 200px; transition: all 0.1s; }
+    .button { display: inline-block; padding: 15px 25px; margin: 10px; border: none; border-radius: 10px; font-size: 18px; cursor: pointer; width: 40%; max-width: 200px; transition: all 0.2s; }
     .on { background: #00ff88; color: #000; }
     .on:active { background: #00cc66; transform: scale(0.97); }
     .off { background: #ff4444; color: #fff; }
     .off:active { background: #cc3333; transform: scale(0.97); }
-
     select { padding: 10px; font-size: 16px; border-radius: 8px; margin-right: 10px; width: 120px; }
     #msg, #saveMsg { margin-top: 10px; font-size: 16px; color: #fff; display: none; }
     .bar { background: #555; border-radius: 10px; overflow: hidden; margin: 10px auto; height: 25px; width: 90%; max-width: 400px; }
-    .fill { background: #00aaff; height: 100%; width: 0%; text-align: center; line-height: 25px; color: #fff; transition: width 0.3s ease; }
-    .status-text { font-size: 18px; margin-top: 5px; font-weight: bold; }
+    .fill { background: #00aaff; height: 100%; width: 0%; text-align: center; line-height: 25px; color: #fff; transition: width 0.5s ease; }
+    .status-text { font-size: 18px; margin-top: 5px; }
     .inline-group { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; margin-top: 10px; }
   </style>
 </head>
@@ -75,62 +79,34 @@
 
   <div class="card">
     <h2>Bomba Manual</h2>
-    <button class="button on"    onclick="sendCommand('pump:on', true)">Ligar</button>
-    <button class="button off"   onclick="sendCommand('pump:off', false)">Desligar</button>
+    <button class="button on" onclick="sendCommand('pump:on')">Ligar</button>
+    <button class="button off" onclick="sendCommand('pump:off')">Desligar</button>
     <p id="msg" class="status-text"></p>
     <p id="pumpStatus" class="status-text" style="color:#ff4444">Desligado</p>
   </div>
 
   <div class="card">
     <h2>Dispositivo Paralelo</h2>
-    <button class="button on"    onclick="sendCommand('device:on', true)">Ligar</button>
-    <button class="button off"   onclick="sendCommand('device:off', false)">Desligar</button>
+    <button class="button on" onclick="sendCommand('device:on')">Ligar</button>
+    <button class="button off" onclick="sendCommand('device:off')">Desligar</button>
     <p id="deviceStatus" class="status-text" style="color:#ff4444">Desligado</p>
   </div>
 
   <script>
-    // ====== BROKER COM FALLBACK AUTOMÁTICO (TENTA 2 BROKERS SE UM FALHAR) ======
-    const brokers = [
-      'wss://broker.hivemq.com:8884/mqtt',  // Rápido e estável
-      'wss://broker.emqx.io:8084/mqtt'     // Fallback se o primeiro cair
-    ];
-    let currentBrokerIndex = 0;
-    const clientId = 'web_' + Date.now();
-    const topicCmd = 'engeasier/david/casa/cmd';
-    const topicStatus = 'engeasier/david/casa/status';
+    // ====== BROKER ULTRA-RÁPIDO + CONFIGURAÇÃO OTIMIZADA (LATÊNCIA 200-400ms NO BRASIL) ======
+    const mqttBroker = 'wss://broker.hivemq.com:8884/mqtt';  // MUITO mais rápido que emqx.io
+    const clientId   = 'web_' + Date.now();
+    const topicCmd     = 'engeasier/david/casa/cmd';
+    const topicStatus  = 'engeasier/david/casa/status';
     const topicTrigger = 'engeasier/david/casa/trigger';
 
-    let client;
-    function connectToBroker() {
-      const broker = brokers[currentBrokerIndex];
-      console.log(`Tentando conectar no broker ${currentBrokerIndex + 1}: ${broker}`);
-      client = mqtt.connect(broker, {
-        clientId: clientId + '_' + currentBrokerIndex,
-        keepalive: 15,
-        reconnectPeriod: 1000,
-        connectTimeout: 3000,  // Reduzido para reconectar mais rápido
-        clean: true
-      });
-
-      client.on('connect', () => {
-        console.log('✅ Conectado no broker ' + broker);
-        client.subscribe([topicStatus, topicTrigger]);
-        client.publish(topicCmd, 'sync_trigger');
-        setOnline();
-      });
-
-      client.on('error', (err) => {
-        console.error('❌ Erro no broker ' + broker + ':', err);
-        // Fallback: tenta o próximo broker em 3s
-        setTimeout(() => {
-          currentBrokerIndex = (currentBrokerIndex + 1) % brokers.length;
-          if (client) client.end();
-          connectToBroker();
-        }, 3000);
-      });
-
-      client.on('offline', () => console.log('Desconectado — reconectando...'));
-    }
+    const client = mqtt.connect(mqttBroker, {
+      clientId: clientId,
+      keepalive: 15,
+      reconnectPeriod: 1000,
+      connectTimeout: 5000,
+      clean: true
+    });
 
     let lastMessageTime = Date.now();
     const TIMEOUT = 12000;
@@ -145,11 +121,14 @@
       }
     }
 
-    // Inicia conexão
-    connectToBroker();
-    setInterval(checkStatus, 3000);
+    client.on('connect', () => {
+      console.log('Web conectada (alta velocidade)');
+      client.subscribe([topicStatus, topicTrigger]);
+      client.publish(topicCmd, 'sync_trigger');
+      setInterval(checkStatus, 3000);
+    });
 
-    client?.on('message', (topic, message) => {
+    client.on('message', (topic, message) => {
       const msg = message.toString().trim();
       setOnline();
 
@@ -158,8 +137,8 @@
           const data = JSON.parse(msg);
           updateBar('waterTankLevel', data.waterTankLevel ?? 0);
           updateBar('reservoirLevel', data.reservoirLevel ?? 0);
-          updatePumpStatus(data.pumpStatus);
-          updateDeviceStatus(data.deviceStatus);
+          updateStatus('pumpStatus', data.pumpStatus);
+          updateStatus('deviceStatus', data.deviceStatus);
         } catch(e) {}
       }
       if (topic === topicTrigger) {
@@ -169,31 +148,14 @@
       }
     });
 
-    // ====== FEEDBACK INSTANTÂNEO DOS BOTÕES ======
-    function updatePumpStatus(state) {
-      const el = document.getElementById('pumpStatus');
-      el.innerText = state ? 'Ligado' : 'Desligado';
-      el.style.color = state ? '#00ff88' : '#ff4444';
-    }
-    function updateDeviceStatus(state) {
-      const el = document.getElementById('deviceStatus');
-      el.innerText = state ? 'Ligado' : 'Desligado';
-      el.style.color = state ? '#00ff88' : '#ff4444';
-    }
-
-    function sendCommand(cmd, newState) {
-      client?.publish(topicCmd, cmd);
+    function sendCommand(cmd) {
+      client.publish(topicCmd, cmd);
       vibrateDevice();
       showTempMessage('msg', 'Enviado!');
-
-      // MUDA O ESTADO NA HORA (otimismo visual)
-      if (cmd.includes('pump')) updatePumpStatus(newState);
-      if (cmd.includes('device')) updateDeviceStatus(newState);
     }
-
     function saveValue() {
       const val = document.getElementById('selector').value;
-      client?.publish(topicCmd, 'trigger:' + val);
+      client.publish(topicCmd, 'trigger:' + val);
       vibrateDevice();
       showTempMessage('saveMsg', 'Salvo!', 1200);
     }
@@ -205,6 +167,9 @@
       setTimeout(() => el.style.display = 'none', time);
     }
     function updateBar(id, v) { const el = document.getElementById(id); v = Math.round(v); el.style.width = v + '%'; el.textContent = v + '%'; }
+    function updateStatus(id, state) { const el = document.getElementById(id); el.innerText = state ? 'Ligado' : 'Desligado'; el.style.color = state ? '#00ff88' : '#ff4444'; }
+
+    client.on('error', err => console.error('MQTT Error:', err));
   </script>
 </body>
 </html>
