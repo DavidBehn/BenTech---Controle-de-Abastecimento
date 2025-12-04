@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8">
-  <title>Controle de Abastecimento - BenTech</title>
+  <title>Controle de Abastecimento - BenTech,Tech</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
@@ -20,13 +20,11 @@
     .header img { width: 40px; height: 40px; }
     h1 { font-size: 20px; margin: 0; }
 
-    /* BOLINHA DE STATUS */
     .status-dot {
       width: 14px; height: 14px; border-radius: 50%; background: #ff4444;
       box-shadow: 0 0 10px #ff4444; animation: pulse-red 2s infinite;
     }
     .online { background: #00ff88 !important; box-shadow: 0 0 15px #00ff88 !important; animation: pulse-green 2s infinite !important; }
-
     @keyframes pulse-red { 0%,100% { opacity: 0.7; } 50% { opacity: 1; } }
     @keyframes pulse-green { 0%,100% { opacity: 0.8; } 50% { opacity: 1; } }
 
@@ -49,10 +47,9 @@
   <div class="header">
     <img src="logo.png" alt="BenTech">
     <h1>Controle de Abastecimento</h1>
-    <div id="statusDot" class="status-dot"></div> <!-- Bolinha aqui -->
+    <div id="statusDot" class="status-dot"></div>
   </div>
 
-  <!-- Todo o resto do conteúdo (igual antes) -->
   <div class="card">
     <h2>Níveis de Reservatório</h2>
     <p>Caixa d'Água</p>
@@ -81,16 +78,16 @@
 
   <div class="card">
     <h2>Bomba Manual</h2>
-    <button class="button on" onclick="sendCommand('pump:on')">Ligar</button>
-    <button class="button off" onclick="sendCommand('pump:off')">Desligar</button>
+    <button class="button on"  onclick="sendCommand('pump:on', true)">Ligar</button>
+    <button class="button off" onclick="sendCommand('pump:off', false)">Desligar</button>
     <p id="msg" class="status-text"></p>
     <p id="pumpStatus" class="status-text" style="color:#ff4444">Desligado</p>
   </div>
 
   <div class="card">
     <h2>Dispositivo Paralelo</h2>
-    <button class="button on" onclick="sendCommand('device:on')">Ligar</button>
-    <button class="button off" onclick="sendCommand('device:off')">Desligar</button>
+    <button class="button on"  onclick="sendCommand('device:on', true)">Ligar</button>
+    <button class="button off" onclick="sendCommand('device:off', false)">Desligar</button>
     <p id="deviceStatus" class="status-text" style="color:#ff4444">Desligado</p>
   </div>
 
@@ -104,7 +101,7 @@
     const client = mqtt.connect(mqttBroker, { clientId, keepalive: 30, reconnectPeriod: 3000 });
 
     let lastMessageTime = 0;
-    const TIMEOUT = 15000; // 15 segundos sem mensagem = OFFLINE
+    const TIMEOUT = 15000;
 
     function setOnline() {
       document.getElementById('statusDot').classList.add('online');
@@ -124,15 +121,14 @@
     });
 
     client.on('message', (topic, message) => {
-      if (topic === topicStatus || topic === topicTrigger) {
-        setOnline();
-      }
+      if (topic === topicStatus || topic === topicTrigger) setOnline();
 
       if (topic === topicStatus) {
         try {
           const data = JSON.parse(message.toString());
           if (data.waterTankLevel !== undefined) updateBar('waterTankLevel', data.waterTankLevel);
           if (data.reservoirLevel !== undefined) updateBar('reservoirLevel', data.reservoirLevel);
+          // Deixa o ESP32 confirmar o estado real (mais confiável)
           if (data.pumpStatus !== undefined) updateStatus('pumpStatus', data.pumpStatus);
           if (data.deviceStatus !== undefined) updateStatus('deviceStatus', data.deviceStatus);
         } catch(e) {}
@@ -145,12 +141,41 @@
       }
     });
 
-    function sendCommand(cmd) { client.publish(topicCmd, cmd); vibrateDevice(); showTempMessage('msg', 'Enviado!'); }
-    function saveValue() { const val = document.getElementById('selector').value; client.publish(topicCmd, 'trigger:' + val); vibrateDevice(); showTempMessage('saveMsg', 'Salvo!', 2000); }
+    // AQUI ESTÁ A MÁGICA: muda o texto NA HORA que você clica!
+    function sendCommand(cmd, novoEstado) {
+      client.publish(topicCmd, cmd);
+      vibrateDevice();
+      showTempMessage('msg', 'Enviado!');
+
+      // Feedback instantâneo (otimismo visual)
+      if (cmd.includes('pump'))   updateStatus('pumpStatus', novoEstado);
+      if (cmd.includes('device')) updateStatus('deviceStatus', novoEstado);
+    }
+
+    function saveValue() {
+      const val = document.getElementById('selector').value;
+      client.publish(topicCmd, 'trigger:' + val);
+      vibrateDevice();
+      showTempMessage('saveMsg', 'Salvo!', 2000);
+    }
+
     function vibrateDevice() { if ("vibrate" in navigator) navigator.vibrate(50); }
-    function showTempMessage(id, text, time = 2000) { const el = document.getElementById(id); el.innerText = text; el.style.display = 'block'; setTimeout(() => el.style.display = 'none', time); }
-    function updateBar(id, v) { const el = document.getElementById(id); v = Math.round(v); el.style.width = v + '%'; el.textContent = v + '%'; }
-    function updateStatus(id, state) { const el = document.getElementById(id); el.innerText = state ? 'Ligado' : 'Desligado'; el.style.color = state ? '#00ff88' : '#ff4444'; }
+    function showTempMessage(id, text, time = 2000) {
+      const el = document.getElementById(id);
+      el.innerText = text; el.style.display = 'block';
+      setTimeout(() => el.style.display = 'none', time);
+    }
+    function updateBar(id, v) {
+      const el = document.getElementById(id);
+      v = Math.round(v);
+      el.style.width = v + '%';
+      el.textContent = v + '%';
+    }
+    function updateStatus(id, state) {
+      const el = document.getElementById(id);
+      el.innerText = state ? 'Ligado' : 'Desligado';
+      el.style.color = state ? '#00ff88' : '#ff4444';
+    }
   </script>
 </body>
 </html>
