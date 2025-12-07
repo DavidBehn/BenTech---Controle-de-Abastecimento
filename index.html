@@ -136,6 +136,36 @@
       }
     });
 
+<script>
+    // ===== LEITURA AUTOMÁTICA DO CLIENTE VIA URL (FORMA 1) =====
+    const urlParams = new URLSearchParams(window.location.search);
+    let cliente = urlParams.get('c');
+    let senha   = urlParams.get('s');
+
+    if (!cliente || !senha) {
+      // Se abrir sem parâmetro, pede (FORMA 2 – fallback)
+      cliente = prompt("Digite seu código de cliente:");
+      senha   = prompt("Digite sua senha:");
+    }
+
+    // Tópicos únicos por cliente
+    const topicCommand = `bentech/${cliente}/cmd`;
+    const topicStatus  = `bentech/${cliente}/status`;
+    const topicTrigger = `bentech/${cliente}/trigger`;
+
+    const client = mqtt.connect('wss://broker.emqx.io:8083/mqtt', {
+      clientId: 'web_' + Math.random().toString(16).substr(2,8),
+      keepalive: 30,
+      reconnectPeriod: 3000,
+      clean: false
+    });
+
+    client.on('connect', () => {
+      console.log('Conectado como:', cliente);
+      client.subscribe(topicStatus);
+      client.subscribe(topicTrigger);
+    });
+    
     // Função principal com feedback instantâneo
     function sendCommand(cmd, state, statusId = 'pumpStatus') {
       client.publish(topicCmd, cmd);
