@@ -184,6 +184,21 @@
       el.innerText = state ? 'Ligado' : 'Desligado';
       el.style.color = state ? '#00ff88' : '#ff4444';
     }
+
+const urlParams = new URLSearchParams(window.location.search);
+const cliente = urlParams.get('c') || prompt("Digite seu código de cliente:");
+const senha   = urlParams.get('s') || prompt("Digite sua senha:");
+
+const topicCommand = `bentech/${cliente}/cmd`;
+const topicStatus  = `bentech/${cliente}/status`;
+const topicTrigger = `bentech/${cliente}/trigger`;
+
+const client = mqtt.connect('wss://broker.bentech.automacao.com.br:8083/mqtt', {
+  clientId: 'web_' + Math.random().toString(16),
+  username: cliente,
+  password: senha
+});
+    
   </script>
 </body>
 </html>
