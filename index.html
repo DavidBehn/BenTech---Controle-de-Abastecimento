@@ -8,44 +8,72 @@
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <style>
     html, body { height: 100%; margin: 0; padding: 0; background-color: #000; overflow-x: hidden; }
-    body { font-family: Arial, sans-serif; color: #fff; text-align: center;
-      background: linear-gradient(rgba(0,0,0,0.70), rgba(0,0,0,0.70)), url('bg.jpg') center top/cover no-repeat fixed; }
-    body::before { content: ""; position: fixed; top: -50%; left: 0; height: 200%; background: url('bg.jpg') center/cover no-repeat fixed; z-index: -1; }
-    @supports (-webkit-touch-callout: none) { html, body { height: -webkit-fill-available; } }
-    .header {
-      display: flex; align-items: center; justify-content: center; background: rgba(17,17,17,0.9);
-      padding: 10px 15px; margin: 15px auto; border-radius: 10px; width: 90%; max-width: 405px; gap: 12px;
+    body { 
+      font-family: Arial, sans-serif; color: #fff; text-align: center;
+      background: linear-gradient(rgba(0,0,0,0.70), rgba(0,0,0,0.70)), url('bg.jpg') center top/cover no-repeat fixed; 
     }
-    .header img {665 width: 40px; height: 40px; }
+    body::before { 
+      content: ""; position: fixed; top: -50%; left: 0; height: 200%; 
+      background: url('bg.jpg') center/cover no-repeat fixed; z-index: -1; 
+    }
+    @supports (-webkit-touch-callout: none) { html, body { height: -webkit-fill-available; } }
+
+    .header {
+      display: flex; align-items: center; justify-content: center; gap: 12px;
+      background: rgba(17,17,17,0.9); padding: 10px 15px; margin: 15px auto; 
+      border-radius: 10px; width: 90%; max-width: 405px; flex-wrap: wrap;
+    }
+    .header img { width: 40px; height: 40px; }
     h1 { font-size: 20px; margin: 0; }
+
     .status-dot {
-      width: 8px; height: 8px; border-radius: 50%; background: #ff4444;
+      width: 10px; height: 10px; border-radius: 50%; background: #ff4444;
       box-shadow: 0 0 10px #ff4444; animation: pulse-red 2s infinite;
     }
-    .online { background: #00ff88 !important; box-shadow: 0 0 15px #00ff88 !important; animation: pulse-green 2s infinite !important; }
+    .online { 
+      background: #00ff88 !important; box-shadow: 0 0 15px #00ff88 !important; 
+      animation: pulse-green 2s infinite !important; 
+    }
     @keyframes pulse-red { 0%,100% { opacity: 0.7; } 50% { opacity: 1; } }
     @keyframes pulse-green { 0%,100% { opacity: 0.8; } 50% { opacity: 1; } }
-    .card { background: rgba(51,51,51,0.7); padding: 20px; margin: 15px auto; border-radius: 15px; width: 90%; max-width: 400px; }
-    .button { display: inline-block; padding: 15px 25px; margin: 10px; border: none; border-radius: 10px; font-size: 18px; cursor: pointer; width: 40%; max-width: 200px; transition: all 0.2s; }
+
+    .card { 
+      background: rgba(51,51,51,0.7); padding: 20px; margin: 15px auto; 
+      border-radius: 15px; width: 90%; max-width: 400px; 
+    }
+    .button { 
+      display: inline-block; padding: 15px 25px; margin: 10px; border: none; 
+      border-radius: 10px; font-size: 18px; cursor: pointer; width: 40%; 
+      max-width: 200px; transition: all 0.2s; 
+    }
     .on { background: #00ff88; color: #000; }
     .on:active { background: #00cc66; transform: scale(0.97); }
     .off { background: #ff4444; color: #fff; }
     .off:active { background: #cc3333; transform: scale(0.97); }
-    select { padding: 10px; font-size: 16px; border-radius: 8px; margin-right: 10px; width: 120px; }
+
+    select { padding: 10px; font-size: 16px; border-radius: 8px; width: 120px; }
     #msg, #saveMsg { margin-top: 10px; font-size: 16px; color: #fff; display: none; }
-    .bar { background: #555; border-radius: 10px; overflow: hidden; margin: 10px auto; height: 25px; width: 90%; max-width: 400px; }
-    .fill { background: #00aaff; height: 100%; width: 0%; text-align: center; line-height: 25px; color: #fff; transition: width 0.5s ease; }
+
+    .bar { 
+      background: #555; border-radius: 10px; overflow: hidden; 
+      margin: 10px auto; height: 25px; width: 90%; max-width: 400px; 
+    }
+    .fill { 
+      background: #00aaff; height: 100%; width: 0%; text-align: center; 
+      line-height: 25px; color: #fff; transition: width 0.5s ease; 
+    }
     .status-text { font-size: 18px; margin-top: 5px; }
     .inline-group { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; margin-top: 10px; }
   </style>
 </head>
 <body>
+
   <div class="header">
     <img src="logo.png" alt="BenTech">
     <h1>Controle de Abastecimento</h1>
     <div id="statusDot" class="status-dot"></div>
-  </div> 
-  
+  </div>
+
   <div class="card">
     <h2>Níveis de Reservatório</h2>
     <p>Caixa d'Água</p>
@@ -53,7 +81,8 @@
     <p>Reservatório</p>
     <div class="bar"><div id="reservoirLevel" class="fill">0%</div></div>
   </div>
-  <p>Obs: O reservatório precisa estar acima <br>de 25% para acionamento automático</br></p>
+
+  <p style="font-size:14px;">Obs: O reservatório precisa estar acima<br>de 25% para acionamento automático</p>
 
   <div class="card">
     <h2>Bomba Automática</h2>
@@ -87,13 +116,20 @@
   </div>
 
   <script>
+    
+    const CLIENTE = "David";          // ← AQUI É SÓ MUDAR
+
+    // Tópicos gerados automaticamente
+    const base         = "Bentech/" + CLIENTE + "/abastecimento";
+    const topicCmd     = base + "/cmd";
+    const topicStatus  = base + "/status";
+    const topicTrigger = base + "/trigger";
+
+    // Conexão MQTT
     const mqttBroker = 'wss://broker.emqx.io:8084/mqtt';
     const clientId = 'web_' + Date.now();
-    const topicCmd = 'engeasier/david/casa/cmd';
-    const topicStatus = 'engeasier/david/casa/status';
-    const topicTrigger = 'engeasier/david/casa/trigger';
-
     const client = mqtt.connect(mqttBroker, { clientId, keepalive: 30, reconnectPeriod: 3000 });
+
     let lastMessageTime = 0;
     const TIMEOUT = 10000;
 
@@ -109,16 +145,13 @@
     }
 
     client.on('connect', () => {
+      console.log("Conectado ao broker MQTT");
       client.subscribe([topicStatus, topicTrigger]);
-      client.publish(topicCmd, 'sync_trigger');
       setInterval(checkStatus, 5000);
     });
 
     client.on('message', (topic, message) => {
-      if (topic === topicStatus || topic === topicTrigger) {
-        setOnline();
-      }
-
+      setOnline();
       if (topic === topicStatus) {
         try {
           const data = JSON.parse(message.toString());
@@ -128,30 +161,20 @@
           if (data.deviceStatus !== undefined) updateStatus('deviceStatus', data.deviceStatus);
         } catch(e) { console.error(e); }
       }
-
       if (topic === topicTrigger) {
         let val = parseInt(message.toString());
-        if (val >= 99) val = 99;
-        document.getElementById('selector').value = val;
+        document.getElementById('selector').value = (val >= 99 ? 99 : val);
       }
     });
 
-    // Função principal com feedback instantâneo
     function sendCommand(cmd, state, statusId = 'pumpStatus') {
       client.publish(topicCmd, cmd);
       vibrateDevice();
-      
-      // Atualização imediata na tela (otimismo local)
       if (statusId) {
         const el = document.getElementById(statusId);
         el.innerText = state ? 'Ligado' : 'Desligado';
         el.style.color = state ? '#00ff88' : '#ff4444';
       }
-
-      // Mensagem temporária só para bomba manual
-      //if (statusId === 'pumpStatus') {
-      //  showTempMessage('msg', 'Enviado!', 1500);
-      //}
     }
 
     function saveValue() {
@@ -161,8 +184,8 @@
       showTempMessage('saveMsg', 'Salvo!', 2000);
     }
 
-    function vibrateDevice() {
-      if ("vibrate" in navigator) navigator.vibrate(50);
+    function vibrateDevice() { 
+      if ("vibrate" in navigator) navigator.vibrate(50); 
     }
 
     function showTempMessage(id, text, time = 2000) {
