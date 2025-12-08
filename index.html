@@ -4,17 +4,18 @@
   <meta charset="UTF-8">
   <title>Controle de Abastecimento - BenTech</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+  <link rel="shortcut icon" href="https://davidbehn.github.io/bentech-assets/favicon.ico" type="image/x-icon">  <!- Link aqui! ->
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <style>
     html, body { height: 100%; margin: 0; padding: 0; background-color: #000; overflow-x: hidden; }
     body { 
       font-family: Arial, sans-serif; color: #fff; text-align: center;
-      background: linear-gradient(rgba(0,0,0,0.70), rgba(0,0,0,0.70)), url('bg.jpg') center top/cover no-repeat fixed; 
+      background: linear-gradient(rgba(0,0,0,0.70), rgba(0,0,0,0.70)),
+              url('https://davidbehn.github.io/bentech-assets/bg.jpg') center top/cover no-repeat fixed; <!- Link aqui! ->
     }
     body::before { 
       content: ""; position: fixed; top: -50%; left: 0; height: 200%; 
-      background: url('bg.jpg') center/cover no-repeat fixed; z-index: -1; 
+      background: url('https://davidbehn.github.io/bentech-assets/bg.jpg') center/cover no-repeat fixed; <!- Link aqui! ->
     }
     @supports (-webkit-touch-callout: none) { html, body { height: -webkit-fill-available; } }
 
@@ -69,10 +70,10 @@
 <body>
 
   <div class="header">
-    <img src="logo.png" alt="BenTech">
-    <h1>Controle de Abastecimento</h1>
-    <div id="statusDot" class="status-dot"></div>
-  </div>
+  <img src="https://davidbehn.github.io/bentech-assets/logo.png" alt="BenTech">  <!- Link aqui! ->
+  <h1>Controle de Abastecimento</h1>
+  <div id="statusDot" class="status-dot"></div>
+</div>
 
   <div class="card">
     <h2>Níveis de Reservatório</h2>
@@ -117,7 +118,7 @@
 
   <script>
     
-    const CLIENTE = "David";          // ← AQUI É SÓ MUDAR
+    const CLIENTE = "Tais";          // ← AQUI É SÓ MUDAR
 
     // Tópicos gerados automaticamente
     const base         = "Bentech/" + CLIENTE + "/abastecimento";
