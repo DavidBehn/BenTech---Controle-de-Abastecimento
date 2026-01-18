@@ -68,7 +68,6 @@
     <h1>Controle de Abastecimento</h1>
     <div id="statusDot" class="status-dot"></div>
   </div>
-
   <div class="card">
     <h2>Níveis de Reservatório</h2>
     <p>Caixa d'Água</p>
@@ -76,9 +75,7 @@
     <p>Reservatório</p>
     <div class="bar"><div id="reservoirLevel" class="fill">0%</div></div>
   </div>
-
   <p style="font-size:14px;">Obs: O reservatório precisa estar acima<br>de 25% para acionamento automático</p>
-
   <div class="card">
     <h2>Bomba Automática</h2>
     <p>Nível para ligar automaticamente</p>
@@ -94,7 +91,6 @@
     </div>
     <p id="saveMsg" class="status-text"></p>
   </div>
-
   <div class="card">
     <h2>Bomba Manual</h2>
     <button class="button on" onclick="sendCommand('pump:on')">Ligar</button>
@@ -102,62 +98,53 @@
     <p id="msg" class="status-text"></p>
     <p id="pumpStatus" class="status-text" style="color:#ff4444">Desligado</p>
   </div>
-
   <div class="card">
     <h2>Dispositivo Paralelo</h2>
     <button class="button on" onclick="sendCommand('device:on')">Ligar</button>
     <button class="button off" onclick="sendCommand('device:off')">Desligar</button>
     <p id="deviceStatus" class="status-text" style="color:#ff4444">Desligado</p>
   </div>
-
   <script>
     // Configuração principal - AJUSTE AQUI SE NECESSÁRIO
-    const CLIENTE = "David";  // Deve ser igual ao clientName no código ESP32 ("Tais")
+    const CLIENTE = "David"; // Deve ser igual ao clientName no código ESP32 ("Tais")
     const baseTopic = "Bentech/" + CLIENTE + "/abastecimento";
-    const topicCmd     = baseTopic + "/cmd";
-    const topicStatus  = baseTopic + "/status";
+    const topicCmd = baseTopic + "/cmd";
+    const topicStatus = baseTopic + "/status";
     const topicTrigger = baseTopic + "/trigger";
-
     // Credenciais do EMQX Cloud Serverless (use as mesmas do ESP32 ou crie um user separado para o web)
     const mqttOptions = {
-      username: "WDWDistribuidora",      // ← CONFIRME NO CONSOLE EMQX > Authentication
-      password: "923856",                // ← CONFIRME A SENHA EXATA
+      username: "WDWDistribuidora", // ← CONFIRME NO CONSOLE EMQX > Authentication
+      password: "923856", // ← CONFIRME A SENHA EXATA
       clientId: 'web_bentech_' + Math.random().toString(16).substr(2, 8),
       keepalive: 30,
       reconnectPeriod: 3000,
       clean: true,
-      protocolVersion: 4  // MQTT 3.1.1 (padrão compatível)
+      protocolVersion: 4 // MQTT 3.1.1 (padrão compatível)
     };
-
     // Conexão WebSocket segura no seu cluster Serverless (porta 8084)
     const mqttBroker = 'wss://u4182f38.ala.us-east-1.emqxsl.com:8084/mqtt';
     const client = mqtt.connect(mqttBroker, mqttOptions);
-
     let lastMessageTime = 0;
     const TIMEOUT = 10000; // 10 segundos sem mensagem → dot vermelho
-
     function setOnline() {
       document.getElementById('statusDot').classList.add('online');
       lastMessageTime = Date.now();
     }
-
     function checkStatus() {
       if (Date.now() - lastMessageTime > TIMEOUT) {
         document.getElementById('statusDot').classList.remove('online');
       }
     }
-
     client.on('connect', () => {
-      console.log("Conectado ao EMQX Cloud Serverless via WebSocket Seguro!");
+      console.log("MQTT conectado com sucesso!");
       client.subscribe([topicStatus, topicTrigger]);
       setInterval(checkStatus, 5000);
       setOnline();
     });
-
     client.on('message', (topic, message) => {
       setOnline();
       const msg = message.toString();
-
+      console.log(`Mensagem recebida no tópico ${topic}: ${msg}`);
       if (topic === topicStatus) {
         try {
           const data = JSON.parse(msg);
@@ -173,7 +160,6 @@
           console.error("Erro ao parsear JSON de status:", e);
         }
       }
-
       if (topic === topicTrigger) {
         let val = parseInt(msg);
         if (!isNaN(val)) {
@@ -182,17 +168,20 @@
         }
       }
     });
-
     client.on('error', (err) => {
-      console.error("Erro na conexão MQTT WebSocket:", err);
+      console.error("MQTT ERROR:", err.message || err);
       document.getElementById('statusDot').classList.remove('online');
     });
-
+    client.on('reconnect', () => {
+      console.log("Tentando reconectar MQTT...");
+    });
     client.on('close', () => {
       console.log("Conexão MQTT fechada");
       document.getElementById('statusDot').classList.remove('online');
     });
-
+    client.on('offline', () => {
+      console.log("MQTT offline");
+    });
     function sendCommand(cmd) {
       if (client.connected) {
         client.publish(topicCmd, cmd);
@@ -202,7 +191,6 @@
         showTempMessage('msg', 'Sem conexão com o dispositivo', 3000);
       }
     }
-
     function saveValue() {
       const val = document.getElementById('selector').value;
       if (client.connected) {
@@ -213,31 +201,26 @@
         showTempMessage('saveMsg', 'Sem conexão com o dispositivo', 3000);
       }
     }
-
     function vibrateDevice() {
       if ("vibrate" in navigator) navigator.vibrate(50);
     }
-
     function showTempMessage(id, text, time = 2000) {
       const el = document.getElementById(id);
       el.innerText = text;
       el.style.display = 'block';
       setTimeout(() => el.style.display = 'none', time);
     }
-
     function updateBar(id, v) {
       const el = document.getElementById(id);
       v = Math.round(v);
       el.style.width = v + '%';
       el.textContent = v + '%';
     }
-
     function updateStatus(id, state) {
       const el = document.getElementById(id);
       el.innerText = state ? 'Ligado' : 'Desligado';
       el.style.color = state ? '#00ff88' : '#ff4444';
     }
-
     // Inicializa verificação de status
     setInterval(checkStatus, 5000);
   </script>
