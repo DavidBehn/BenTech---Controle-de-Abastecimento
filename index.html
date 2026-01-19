@@ -2,52 +2,56 @@
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8">
-  <title>Debug MQTT BenTech</title>
+  <title>Debug MQTT BenTech - Sem Credenciais</title>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 </head>
 <body>
-  <h1>Debug Conexão MQTT</h1>
-  <p id="status">Iniciando...</p>
-  <pre id="log"></pre>
+  <h1>Teste de Conexão (Anônima)</h1>
+  <p id="status" style="font-size:24px; color:yellow;">Tentando conectar...</p>
+  <pre id="log" style="text-align:left; background:#222; padding:10px; color:#0f0; max-height:300px; overflow:auto;"></pre>
 
   <script>
     const broker = 'wss://u4182f38.ala.us-east-1.emqxsl.com:8084/mqtt';
+
+    // SEM username/password → conexão anônima
     const options = {
-      clientId: 'debug_' + Date.now(),
+      clientId: 'debug_web_' + Date.now(),
       keepalive: 60,
-      reconnectPeriod: 1000,
+      reconnectPeriod: 2000,
       clean: true
     };
 
     const logEl = document.getElementById('log');
-    function log(msg) {
-      console.log(msg);
-      logEl.innerHTML += msg + '\n';
+    function log(msg) { 
+      console.log(msg); 
+      logEl.innerHTML += msg + '\n'; 
+      logEl.scrollTop = logEl.scrollHeight; 
     }
 
-    log('Tentando conectar a: ' + broker);
+    log('Iniciando conexão anônima a: ' + broker);
 
     const client = mqtt.connect(broker, options);
 
     client.on('connect', () => {
-      document.getElementById('status').innerText = 'CONECTADO!';
+      document.getElementById('status').innerText = 'CONECTADO COM SUCESSO!';
       document.getElementById('status').style.color = 'lime';
-      log('Connect success!');
-      client.subscribe('Bentech/Tais/abastecimento/#');
+      log('Connect success! Broker aceitou conexão anônima.');
+      
+      client.subscribe('Bentech/Tais/abastecimento/#'); // wildcard para pegar tudo
     });
 
-    client.on('message', (t, m) => {
-      log('Mensagem: ' + t + ' → ' + m.toString());
+    client.on('message', (topic, message) => {
+      log('Mensagem recebida: ' + topic + ' → ' + message.toString());
     });
 
-    client.on('error', e => {
-      document.getElementById('status').innerText = 'ERRO: ' + e.message;
+    client.on('error', err => {
+      document.getElementById('status').innerText = 'ERRO: ' + err.message;
       document.getElementById('status').style.color = 'red';
-      log('Error: ' + e.message + ' - Code: ' + (e.code || 'N/A'));
+      log('Error: ' + err.message + ' (provavelmente Code: ' + (err.code || 'N/A') + ')');
     });
 
     client.on('close', () => log('Conexão fechada'));
-    client.on('offline', () => log('Offline'));
+    client.on('offline', () => log('Offline - tentando reconectar...'));
   </script>
 </body>
 </html>
