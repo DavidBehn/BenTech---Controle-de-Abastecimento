@@ -2,57 +2,52 @@
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8">
-  <title>Teste MQTT BenTech - Sem Credenciais</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Debug MQTT BenTech</title>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-  <style>
-    body { font-family: Arial; text-align: center; background: #111; color: #fff; padding: 20px; }
-    #status { font-size: 24px; margin: 20px; padding: 15px; border-radius: 10px; }
-    .connected { background: #00aa44; }
-    .error { background: #cc0000; }
-  </style>
 </head>
 <body>
-  <h1>Teste de Conexão MQTT (Sem Auth)</h1>
-  <div id="status">Tentando conectar ao broker...</div>
+  <h1>Debug Conexão MQTT</h1>
+  <p id="status">Iniciando...</p>
+  <pre id="log"></pre>
 
   <script>
     const broker = 'wss://u4182f38.ala.us-east-1.emqxsl.com:8084/mqtt';
-
-    // SEM username/password — essencial para seu deployment atual
     const options = {
-      clientId: 'web_teste_' + Date.now(),
+      clientId: 'debug_' + Date.now(),
       keepalive: 60,
-      reconnectPeriod: 2000,
+      reconnectPeriod: 1000,
       clean: true
     };
+
+    const logEl = document.getElementById('log');
+    function log(msg) {
+      console.log(msg);
+      logEl.innerHTML += msg + '\n';
+    }
+
+    log('Tentando conectar a: ' + broker);
 
     const client = mqtt.connect(broker, options);
 
     client.on('connect', () => {
-      document.getElementById('status').innerText = 'CONECTADO COM SUCESSO!';
-      document.getElementById('status').className = 'connected';
-      console.log('Conectado!');
-
-      // Subscreve para testar se recebe dados do ESP32
-      client.subscribe('Bentech/Tais/abastecimento/status');
-      client.subscribe('Bentech/Tais/abastecimento/trigger');
+      document.getElementById('status').innerText = 'CONECTADO!';
+      document.getElementById('status').style.color = 'lime';
+      log('Connect success!');
+      client.subscribe('Bentech/Tais/abastecimento/#');
     });
 
-    client.on('message', (topic, message) => {
-      console.log('Mensagem recebida em', topic, ':', message.toString());
-      document.getElementById('status').innerText += '\nRecebi: ' + message.toString().substring(0, 100) + '...';
+    client.on('message', (t, m) => {
+      log('Mensagem: ' + t + ' → ' + m.toString());
     });
 
-    client.on('error', (err) => {
-      document.getElementById('status').innerText = 'ERRO: ' + err.message;
-      document.getElementById('status').className = 'error';
-      console.error('Erro MQTT:', err);
+    client.on('error', e => {
+      document.getElementById('status').innerText = 'ERRO: ' + e.message;
+      document.getElementById('status').style.color = 'red';
+      log('Error: ' + e.message + ' - Code: ' + (e.code || 'N/A'));
     });
 
-    client.on('close', () => {
-      console.log('Conexão fechada');
-    });
+    client.on('close', () => log('Conexão fechada'));
+    client.on('offline', () => log('Offline'));
   </script>
 </body>
 </html>
