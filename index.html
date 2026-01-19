@@ -60,6 +60,7 @@
     }
     .status-text { font-size: 18px; margin-top: 5px; }
     .inline-group { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+    .connection-info { font-size: 13px; color: #aaa; margin-top: 5px; }
   </style>
 </head>
 <body>
@@ -68,6 +69,8 @@
     <h1>Controle de Abastecimento</h1>
     <div id="statusDot" class="status-dot"></div>
   </div>
+
+  <div id="connectionInfo" class="connection-info">Conectando ao dispositivo...</div>
 
   <div class="card">
     <h2>Níveis de Reservatório</h2>
@@ -111,106 +114,184 @@
   </div>
 
   <script>
-    // Configuração principal - AJUSTE AQUI SE NECESSÁRIO
-    const CLIENTE = "David";  // Deve ser igual ao clientName no código ESP32 ("Tais")
+    // Configuração principal
+    const CLIENTE = "David"; // Deve coincidir exatamente com clientName no ESP32
     const baseTopic = "Bentech/" + CLIENTE + "/abastecimento";
     const topicCmd     = baseTopic + "/cmd";
     const topicStatus  = baseTopic + "/status";
     const topicTrigger = baseTopic + "/trigger";
 
-    // Credenciais do EMQX Cloud Serverless (use as mesmas do ESP32 ou crie um user separado para o web)
+    // MQTT remoto (EMQX Cloud Serverless)
+    const mqttBroker = 'wss://u4182f38.ala.us-east-1.emqxsl.com:8084/mqtt';
     const mqttOptions = {
-      username: "WDWDistribuidora",      // ← CONFIRME NO CONSOLE EMQX > Authentication
-      password: "923856",                // ← CONFIRME A SENHA EXATA
+      username: "WDWDistribuidora",
+      password: "923856",
       clientId: 'web_bentech_' + Math.random().toString(16).substr(2, 8),
       keepalive: 30,
       reconnectPeriod: 3000,
       clean: true,
-      protocolVersion: 4  // MQTT 3.1.1 (padrão compatível)
+      protocolVersion: 4
     };
 
-    // Conexão WebSocket segura no seu cluster Serverless (porta 8084)
-    const mqttBroker = 'wss://u4182f38.ala.us-east-1.emqxsl.com:8084/mqtt';
-    const client = mqtt.connect(mqttBroker, mqttOptions);
+    let ws = null;
+    let mqttClient = null;
+    let usingLocal = false;
+    let lastMessageTime = Date.now();
+    const TIMEOUT = 12000; // 12 segundos sem atualização → vermelho
 
-    let lastMessageTime = 0;
-    const TIMEOUT = 10000; // 10 segundos sem mensagem → dot vermelho
+    const connectionInfo = document.getElementById('connectionInfo');
 
     function setOnline() {
       document.getElementById('statusDot').classList.add('online');
       lastMessageTime = Date.now();
     }
 
-    function checkStatus() {
-      if (Date.now() - lastMessageTime > TIMEOUT) {
-        document.getElementById('statusDot').classList.remove('online');
+    function setOffline() {
+      document.getElementById('statusDot').classList.remove('online');
+    }
+
+    function updateConnectionText(text) {
+      connectionInfo.innerText = text;
+    }
+
+    // ────────────────────────────────────────────────
+    // Tentativa de conexão LOCAL (WebSocket do ESP32)
+    // ────────────────────────────────────────────────
+    function connectLocal() {
+      const wsUrl = `ws://${window.location.host}/ws`;
+      updateConnectionText("Tentando conexão local (rede interna)...");
+
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        console.log("WebSocket LOCAL conectado!");
+        usingLocal = true;
+        updateConnectionText("Conectado LOCALMENTE via WebSocket");
+        setOnline();
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          processData(data);
+          setOnline();
+        } catch (e) {
+          console.error("Erro ao processar mensagem WebSocket:", e);
+        }
+      };
+
+      ws.onclose = () => {
+        console.log("WebSocket local fechado.");
+        if (!usingLocal) return; // já estamos no MQTT
+        updateConnectionText("Conexão local perdida → tentando MQTT remoto");
+        connectMQTT();
+      };
+
+      ws.onerror = (err) => {
+        console.error("Erro no WebSocket local:", err);
+        ws.close();
+      };
+    }
+
+    // ────────────────────────────────────────────────
+    // Conexão MQTT remota (fallback)
+    // ────────────────────────────────────────────────
+    function connectMQTT() {
+      updateConnectionText("Conectando via MQTT remoto (EMQX Cloud)...");
+      mqttClient = mqtt.connect(mqttBroker, mqttOptions);
+
+      mqttClient.on('connect', () => {
+        console.log("MQTT remoto conectado!");
+        mqttClient.subscribe([topicStatus, topicTrigger]);
+        updateConnectionText("Conectado via MQTT (acesso remoto)");
+        setOnline();
+      });
+
+      mqttClient.on('message', (topic, message) => {
+        const msg = message.toString();
+        setOnline();
+
+        if (topic === topicStatus) {
+          try {
+            const data = JSON.parse(msg);
+            processData(data);
+          } catch (e) {
+            console.error("Erro parse JSON status:", e);
+          }
+        }
+        else if (topic === topicTrigger) {
+          let val = parseInt(msg);
+          if (!isNaN(val)) {
+            val = val >= 99 ? 99 : val;
+            document.getElementById('selector').value = val;
+          }
+        }
+      });
+
+      mqttClient.on('error', (err) => {
+        console.error("Erro MQTT:", err);
+        setOffline();
+        updateConnectionText("Erro na conexão MQTT remota");
+      });
+
+      mqttClient.on('close', () => {
+        setOffline();
+        updateConnectionText("Conexão MQTT remota perdida");
+      });
+    }
+
+    // Processa os dados recebidos (igual para WS e MQTT)
+    function processData(data) {
+      if (data.waterTankLevel !== undefined) updateBar('waterTankLevel', data.waterTankLevel);
+      if (data.reservoirLevel !== undefined) updateBar('reservoirLevel', data.reservoirLevel);
+      if (data.pumpStatus !== undefined) updateStatus('pumpStatus', data.pumpStatus);
+      if (data.deviceStatus !== undefined) updateStatus('deviceStatus', data.deviceStatus);
+      if (data.triggerLevel !== undefined) {
+        let val = data.triggerLevel >= 99 ? 99 : data.triggerLevel;
+        document.getElementById('selector').value = val;
+      }
+      if (data.Msg) {
+        showTempMessage('msg', data.Msg, 3000);
+      }
+      if (data.saveMsg) {
+        showTempMessage('saveMsg', data.saveMsg, 2000);
       }
     }
 
-    client.on('connect', () => {
-      console.log("Conectado ao EMQX Cloud Serverless via WebSocket Seguro!");
-      client.subscribe([topicStatus, topicTrigger]);
-      setInterval(checkStatus, 5000);
-      setOnline();
-    });
-
-    client.on('message', (topic, message) => {
-      setOnline();
-      const msg = message.toString();
-
-      if (topic === topicStatus) {
-        try {
-          const data = JSON.parse(msg);
-          if (data.waterTankLevel !== undefined) updateBar('waterTankLevel', data.waterTankLevel);
-          if (data.reservoirLevel !== undefined) updateBar('reservoirLevel', data.reservoirLevel);
-          if (data.pumpStatus !== undefined) updateStatus('pumpStatus', data.pumpStatus);
-          if (data.deviceStatus !== undefined) updateStatus('deviceStatus', data.deviceStatus);
-          if (data.triggerLevel !== undefined) {
-            let val = data.triggerLevel >= 99 ? 99 : data.triggerLevel;
-            document.getElementById('selector').value = val;
-          }
-        } catch (e) {
-          console.error("Erro ao parsear JSON de status:", e);
-        }
-      }
-
-      if (topic === topicTrigger) {
-        let val = parseInt(msg);
-        if (!isNaN(val)) {
-          val = val >= 99 ? 99 : val;
-          document.getElementById('selector').value = val;
-        }
-      }
-    });
-
-    client.on('error', (err) => {
-      console.error("Erro na conexão MQTT WebSocket:", err);
-      document.getElementById('statusDot').classList.remove('online');
-    });
-
-    client.on('close', () => {
-      console.log("Conexão MQTT fechada");
-      document.getElementById('statusDot').classList.remove('online');
-    });
-
+    // Envia comando (prioriza local, fallback remoto)
     function sendCommand(cmd) {
-      if (client.connected) {
-        client.publish(topicCmd, cmd);
+      if (usingLocal && ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(cmd);
         vibrateDevice();
-        showTempMessage('msg', 'Comando enviado!', 1500);
-      } else {
+        showTempMessage('msg', 'Comando enviado (local)', 1500);
+      }
+      else if (mqttClient && mqttClient.connected) {
+        mqttClient.publish(topicCmd, cmd);
+        vibrateDevice();
+        showTempMessage('msg', 'Comando enviado (remoto)', 1500);
+      }
+      else {
         showTempMessage('msg', 'Sem conexão com o dispositivo', 3000);
       }
     }
 
+    // Salva nível de acionamento automático
     function saveValue() {
       const val = document.getElementById('selector').value;
-      if (client.connected) {
-        client.publish(topicCmd, 'trigger:' + val);
+      const payload = 'trigger:' + val;
+
+      if (usingLocal && ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(payload);
         vibrateDevice();
-        showTempMessage('saveMsg', 'Salvo!', 2000);
-      } else {
-        showTempMessage('saveMsg', 'Sem conexão com o dispositivo', 3000);
+        showTempMessage('saveMsg', 'Salvo localmente', 2000);
+      }
+      else if (mqttClient && mqttClient.connected) {
+        mqttClient.publish(topicCmd, payload);
+        vibrateDevice();
+        showTempMessage('saveMsg', 'Salvo via MQTT', 2000);
+      }
+      else {
+        showTempMessage('saveMsg', 'Sem conexão', 3000);
       }
     }
 
@@ -222,7 +303,7 @@
       const el = document.getElementById(id);
       el.innerText = text;
       el.style.display = 'block';
-      setTimeout(() => el.style.display = 'none', time);
+      setTimeout(() => { el.style.display = 'none'; el.innerText = ''; }, time);
     }
 
     function updateBar(id, v) {
@@ -238,8 +319,15 @@
       el.style.color = state ? '#00ff88' : '#ff4444';
     }
 
-    // Inicializa verificação de status
-    setInterval(checkStatus, 5000);
+    // Verifica timeout de comunicação
+    setInterval(() => {
+      if (Date.now() - lastMessageTime > TIMEOUT) {
+        setOffline();
+      }
+    }, 3000);
+
+    // Inicia tentando conexão LOCAL primeiro
+    connectLocal();
   </script>
 </body>
 </html>
