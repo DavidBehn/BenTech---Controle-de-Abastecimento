@@ -111,21 +111,18 @@
   </div>
 
   <script>
-    // Configuração MQTT - compatível com EMQX Cloud Serverless TLS/WebSocket
     const CLIENTE = "Tais";
     const base = "Bentech/" + CLIENTE + "/abastecimento";
     const topicCmd    = base + "/cmd";
     const topicStatus = base + "/status";
     const topicTrigger = base + "/trigger";
 
-    // Seu broker real EMQX Cloud Serverless (porta WebSocket segura 8084)
     const mqttBroker = 'wss://u4182f38.ala.us-east-1.emqxsl.com:8084/mqtt';
 
-    // Credenciais reais do seu cluster (as mesmas que estão no ESP32)
     const mqttOptions = {
       clientId: 'web_' + CLIENTE + '_' + Date.now(),
-      username: 'j8d7b10c',    // ← SUA CREDENCIAL REAL
-      password: '923856',               // ← SUA SENHA REAL
+      username: 'WDWDistribuidora',    // Remova se não configurou auth no dashboard
+      password: '923856',               // Remova se não configurou auth no dashboard
       keepalive: 30,
       reconnectPeriod: 3000,
       clean: true
@@ -134,7 +131,7 @@
     const client = mqtt.connect(mqttBroker, mqttOptions);
 
     let lastMessageTime = 0;
-    const TIMEOUT = 12000; // um pouco maior para evitar falsos offline
+    const TIMEOUT = 12000;
 
     function setOnline() {
       document.getElementById('statusDot').classList.add('online');
@@ -231,7 +228,6 @@
       el.style.color = state ? '#00ff88' : '#ff4444';
     }
 
-    // Inicializa status offline até conectar
     setInterval(checkStatus, 4000);
   </script>
 </body>
