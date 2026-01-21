@@ -112,29 +112,29 @@
   </div>
 
   <script>
-    const CLIENTE = "David"; // Mantenha igual ao do ESP32
+    const CLIENTE = "David";
 
-    // Tópicos (exatamente iguais ao ESP32)
-    const base = `Bentech/${CLIENTE}/abastecimento`;
-    const topicCmd     = `${base}/cmd`;
-    const topicStatus  = `${base}/status`;
-    const topicTrigger = `${base}/trigger`;
+// Tópicos iguais ao ESP32
+const base = `Bentech/${CLIENTE}/abastecimento`;
+const topicCmd     = `${base}/cmd`;
+const topicStatus  = `${base}/status`;
+const topicTrigger = `${base}/trigger`;
 
-    // Configuração do broker EMQX Cloud (o mesmo do seu ESP32)
-    const mqttOptions = {
-  host: 'wss://u4182f38.ala.us-east-1.emqxsl.com:8084/mqtt',
-  username: 'WDWDistribuidora',
+// Configuração MQTT.js para EMQX Cloud wss (porta 8084)
+const mqttOptions = {
+  host: 'wss://u4182f38.ala.us-east-1.emqxsl.com:8084/mqtt',  // caminho completo /mqtt obrigatório
+  username: 'WDWDistribuidora',    // confira (sem "a" extra no final?)
   password: '923856',
-  clientId: 'web_' + Math.random().toString(16).substr(2, 8),
+  clientId: 'web_client_' + Math.random().toString(16).substr(2, 8),
   clean: true,
   keepalive: 60,
   reconnectPeriod: 5000,
   connectTimeout: 10000,
-  protocolVersion: 4,
-  rejectUnauthorized: false   // ← IGNORA VALIDAÇÃO DO CERTIFICADO (INSEGURA - SÓ TESTE!)
+  protocolVersion: 4,              // MQTT 3.1.1 (mais compatível com browsers)
+  rejectUnauthorized: false        // TEMPORÁRIO: ignora validação do cert (só para depuração!)
 };
 
-    const client = mqtt.connect(mqttOptions.host, mqttOptions);
+const client = mqtt.connect(mqttOptions.host, mqttOptions);
 
     let lastMessageTime = 0;
     const TIMEOUT = 15000; // 15 segundos sem mensagem → vermelho
