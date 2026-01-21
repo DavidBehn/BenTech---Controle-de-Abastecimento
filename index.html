@@ -7,7 +7,6 @@
   <link rel="shortcut icon" href="https://davidbehn.github.io/bentech-assets/favicon.ico" type="image/x-icon">
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <style>
-    /* Seu CSS original mantido intacto */
     html, body { height: 100%; margin: 0; padding: 0; background-color: #000; overflow-x: hidden; }
     body {
       font-family: Arial, sans-serif; color: #fff; text-align: center;
@@ -114,30 +113,30 @@
   <script>
     const CLIENTE = "David";
 
-// Tópicos iguais ao ESP32
-const base = `Bentech/${CLIENTE}/abastecimento`;
-const topicCmd     = `${base}/cmd`;
-const topicStatus  = `${base}/status`;
-const topicTrigger = `${base}/trigger`;
+    // Tópicos exatamente iguais ao ESP32
+    const base = `Bentech/${CLIENTE}/abastecimento`;
+    const topicCmd     = `${base}/cmd`;
+    const topicStatus  = `${base}/status`;
+    const topicTrigger = `${base}/trigger`;
 
-// Configuração MQTT.js para EMQX Cloud wss (porta 8084)
-const mqttOptions = {
-  host: 'wss://u4182f38.ala.us-east-1.emqxsl.com:8084/mqtt',  // caminho completo /mqtt obrigatório
-  username: 'WDWDistribuidora',    // confira (sem "a" extra no final?)
-  password: '923856',
-  clientId: 'web_client_' + Math.random().toString(16).substr(2, 8),
-  clean: true,
-  keepalive: 60,
-  reconnectPeriod: 5000,
-  connectTimeout: 10000,
-  protocolVersion: 4,              // MQTT 3.1.1 (mais compatível com browsers)
-  rejectUnauthorized: false        // TEMPORÁRIO: ignora validação do cert (só para depuração!)
-};
+    // Configuração para EMQX Cloud wss (porta 8084)
+    const mqttOptions = {
+      host: 'wss://u4182f38.ala.us-east-1.emqxsl.com:8084/mqtt',
+      username: 'WDWDistribuidora',
+      password: '923856',
+      clientId: 'web_client_' + Math.random().toString(16).substr(2, 8),
+      clean: true,
+      keepalive: 60,
+      reconnectPeriod: 5000,
+      connectTimeout: 10000,
+      protocolVersion: 4  // MQTT 3.1.1 (mais compatível com navegadores)
+      // rejectUnauthorized: false  // Descomente SOMENTE para teste se ainda falhar (inseguro!)
+    };
 
-const client = mqtt.connect(mqttOptions.host, mqttOptions);
+    const client = mqtt.connect(mqttOptions.host, mqttOptions);
 
     let lastMessageTime = 0;
-    const TIMEOUT = 15000; // 15 segundos sem mensagem → vermelho
+    const TIMEOUT = 15000; // Tempo sem mensagem para considerar offline
 
     function setOnline() {
       document.getElementById('statusDot').classList.add('online');
@@ -151,14 +150,14 @@ const client = mqtt.connect(mqttOptions.host, mqttOptions);
     }
 
     client.on('connect', () => {
-      console.log('Conectado ao broker MQTT (Web)');
+      console.log('Conectado ao broker MQTT via wss (porta 8084)');
       client.subscribe([topicStatus, topicTrigger]);
       setOnline();
       setInterval(checkStatus, 5000);
     });
 
     client.on('error', (err) => {
-      console.error('Erro MQTT:', err);
+      console.error('Erro na conexão MQTT:', err.message || err);
       document.getElementById('statusDot').classList.remove('online');
     });
 
@@ -174,7 +173,7 @@ const client = mqtt.connect(mqttOptions.host, mqttOptions);
           if (data.pumpStatus !== undefined) updateStatus('pumpStatus', data.pumpStatus);
           if (data.deviceStatus !== undefined) updateStatus('deviceStatus', data.deviceStatus);
         } catch (e) {
-          console.error('Erro ao parsear status:', e);
+          console.error('Erro ao parsear mensagem de status:', e);
         }
       }
 
@@ -190,7 +189,7 @@ const client = mqtt.connect(mqttOptions.host, mqttOptions);
       if (client.connected) {
         client.publish(topicCmd, cmd);
         vibrateDevice();
-        showTempMessage('msg', cmd.includes('on') ? 'Comando enviado!' : 'Comando enviado!', 2000);
+        showTempMessage('msg', cmd.includes('on') ? 'Ligando...' : 'Desligando...', 2000);
 
         if (statusId) {
           const el = document.getElementById(statusId);
@@ -198,7 +197,7 @@ const client = mqtt.connect(mqttOptions.host, mqttOptions);
           el.style.color = state ? '#00ff88' : '#ff4444';
         }
       } else {
-        showTempMessage('msg', 'Sem conexão MQTT!', 3000);
+        showTempMessage('msg', 'Sem conexão com o dispositivo!', 3000);
       }
     }
 
@@ -207,9 +206,9 @@ const client = mqtt.connect(mqttOptions.host, mqttOptions);
         const val = document.getElementById('selector').value;
         client.publish(topicCmd, 'trigger:' + val);
         vibrateDevice();
-        showTempMessage('saveMsg', 'Salvo!', 2000);
+        showTempMessage('saveMsg', 'Configuração salva!', 2000);
       } else {
-        showTempMessage('saveMsg', 'Sem conexão MQTT!', 3000);
+        showTempMessage('saveMsg', 'Sem conexão com o dispositivo!', 3000);
       }
     }
 
