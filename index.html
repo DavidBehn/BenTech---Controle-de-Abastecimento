@@ -122,15 +122,17 @@
 
     // Configuração do broker EMQX Cloud (o mesmo do seu ESP32)
     const mqttOptions = {
-      host: 'wss://u4182f38.ala.us-east-1.emqxsl.com:8084/mqtt',  // WebSocket seguro (porta 8084)
-      username: 'WDWDistribuidora',     // ← usuário correto do seu broker
-      password: '923856',               // ← senha correta
-      clientId: 'web_' + Math.random().toString(16).substr(2, 8),
-      clean: true,
-      keepalive: 60,
-      reconnectPeriod: 5000,
-      connectTimeout: 10000
-    };
+  host: 'wss://u4182f38.ala.us-east-1.emqxsl.com:8084/mqtt',
+  username: 'WDWDistribuidora',
+  password: '923856',
+  clientId: 'web_' + Math.random().toString(16).substr(2, 8),
+  clean: true,
+  keepalive: 60,
+  reconnectPeriod: 5000,
+  connectTimeout: 10000,
+  protocolVersion: 4,
+  rejectUnauthorized: false   // ← IGNORA VALIDAÇÃO DO CERTIFICADO (INSEGURA - SÓ TESTE!)
+};
 
     const client = mqtt.connect(mqttOptions.host, mqttOptions);
 
