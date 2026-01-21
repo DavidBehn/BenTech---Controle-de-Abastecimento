@@ -8,61 +8,67 @@
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <style>
     html, body { height: 100%; margin: 0; padding: 0; background-color: #000; overflow-x: hidden; }
-    body {
+    body { 
       font-family: Arial, sans-serif; color: #fff; text-align: center;
       background: linear-gradient(rgba(0,0,0,0.70), rgba(0,0,0,0.70)),
               url('https://davidbehn.github.io/bentech-assets/bg.jpg') center top/cover no-repeat fixed;
     }
-    body::before {
-      content: ""; position: fixed; top: -50%; left: 0; height: 200%;
+    body::before { 
+      content: ""; position: fixed; top: -50%; left: 0; height: 200%; 
       background: url('https://davidbehn.github.io/bentech-assets/bg.jpg') center/cover no-repeat fixed;
     }
     @supports (-webkit-touch-callout: none) { html, body { height: -webkit-fill-available; } }
+
     .header {
       display: flex; align-items: center; justify-content: center; gap: 12px;
-      background: rgba(17,17,17,0.9); padding: 10px 15px; margin: 15px auto;
+      background: rgba(17,17,17,0.9); padding: 10px 15px; margin: 15px auto; 
       border-radius: 10px; width: 90%; max-width: 405px; flex-wrap: wrap;
     }
     .header img { width: 40px; height: 40px; }
     h1 { font-size: 20px; margin: 0; }
+
     .status-dot {
       width: 10px; height: 10px; border-radius: 50%; background: #ff4444;
       box-shadow: 0 0 10px #ff4444; animation: pulse-red 2s infinite;
     }
-    .online {
-      background: #00ff88 !important; box-shadow: 0 0 15px #00ff88 !important;
-      animation: pulse-green 2s infinite !important;
+    .online { 
+      background: #00ff88 !important; box-shadow: 0 0 15px #00ff88 !important; 
+      animation: pulse-green 2s infinite !important; 
     }
     @keyframes pulse-red { 0%,100% { opacity: 0.7; } 50% { opacity: 1; } }
     @keyframes pulse-green { 0%,100% { opacity: 0.8; } 50% { opacity: 1; } }
-    .card {
-      background: rgba(51,51,51,0.7); padding: 20px; margin: 15px auto;
-      border-radius: 15px; width: 90%; max-width: 400px;
+
+    .card { 
+      background: rgba(51,51,51,0.7); padding: 20px; margin: 15px auto; 
+      border-radius: 15px; width: 90%; max-width: 400px; 
     }
-    .button {
-      display: inline-block; padding: 15px 25px; margin: 10px; border: none;
-      border-radius: 10px; font-size: 18px; cursor: pointer; width: 40%;
-      max-width: 200px; transition: all 0.2s;
+    .button { 
+      display: inline-block; padding: 15px 25px; margin: 10px; border: none; 
+      border-radius: 10px; font-size: 18px; cursor: pointer; width: 40%; 
+      max-width: 200px; transition: all 0.2s; 
     }
     .on { background: #00ff88; color: #000; }
     .on:active { background: #00cc66; transform: scale(0.97); }
     .off { background: #ff4444; color: #fff; }
     .off:active { background: #cc3333; transform: scale(0.97); }
+
     select { padding: 10px; font-size: 16px; border-radius: 8px; width: 120px; }
     #msg, #saveMsg { margin-top: 10px; font-size: 16px; color: #fff; display: none; }
-    .bar {
-      background: #555; border-radius: 10px; overflow: hidden;
-      margin: 10px auto; height: 25px; width: 90%; max-width: 400px;
+
+    .bar { 
+      background: #555; border-radius: 10px; overflow: hidden; 
+      margin: 10px auto; height: 25px; width: 90%; max-width: 400px; 
     }
-    .fill {
-      background: #00aaff; height: 100%; width: 0%; text-align: center;
-      line-height: 25px; color: #fff; transition: width 0.5s ease;
+    .fill { 
+      background: #00aaff; height: 100%; width: 0%; text-align: center; 
+      line-height: 25px; color: #fff; transition: width 0.5s ease; 
     }
     .status-text { font-size: 18px; margin-top: 5px; }
     .inline-group { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; margin-top: 10px; }
   </style>
 </head>
 <body>
+
   <div class="header">
     <img src="https://davidbehn.github.io/bentech-assets/logo.png" alt="BenTech">
     <h1>Controle de Abastecimento</h1>
@@ -113,30 +119,29 @@
   <script>
     const CLIENTE = "David";
 
-    // Tópicos exatamente iguais ao ESP32
-    const base = `Bentech/${CLIENTE}/abastecimento`;
+    const base         = `Bentech/${CLIENTE}/abastecimento`;
     const topicCmd     = `${base}/cmd`;
     const topicStatus  = `${base}/status`;
     const topicTrigger = `${base}/trigger`;
 
-    // Configuração para EMQX Cloud wss (porta 8084)
-    const mqttOptions = {
-      host: 'wss://u4182f38.ala.us-east-1.emqxsl.com:8084/mqtt',
+    // Broker privado com WebSocket seguro (ajuste a porta se necessário: 8084 ou 443)
+    const mqttBroker = 'wss://u4182f38.ala.us-east-1.emqxsl.com:8084/mqtt';
+
+    const options = {
+      clientId: 'web_' + Math.random().toString(16).substr(2, 8),
       username: 'WDWDistribuidora',
       password: '923856',
-      clientId: 'web_client_' + Math.random().toString(16).substr(2, 8),
+      keepalive: 30,
+      reconnectPeriod: 3000,
       clean: true,
-      keepalive: 60,
-      reconnectPeriod: 5000,
-      connectTimeout: 10000,
-      protocolVersion: 4  // MQTT 3.1.1 (mais compatível com navegadores)
-      // rejectUnauthorized: false  // Descomente SOMENTE para teste se ainda falhar (inseguro!)
+      // Descomente abaixo SE o certificado der erro no browser (inseguro, use apenas para teste!)
+      // rejectUnauthorized: false
     };
 
-    const client = mqtt.connect(mqttOptions.host, mqttOptions);
+    const client = mqtt.connect(mqttBroker, options);
 
     let lastMessageTime = 0;
-    const TIMEOUT = 15000; // Tempo sem mensagem para considerar offline
+    const TIMEOUT = 15000; // 15 segundos sem mensagem → vermelho
 
     function setOnline() {
       document.getElementById('statusDot').classList.add('online');
@@ -150,38 +155,39 @@
     }
 
     client.on('connect', () => {
-      console.log('Conectado ao broker MQTT via wss (porta 8084)');
-      client.subscribe([topicStatus, topicTrigger]);
-      setOnline();
+      console.log("MQTT WebSocket conectado!");
+      client.subscribe([topicStatus, topicTrigger], (err) => {
+        if (!err) console.log("Subscrito com sucesso");
+      });
       setInterval(checkStatus, 5000);
+      setOnline();
     });
 
     client.on('error', (err) => {
-      console.error('Erro na conexão MQTT:', err.message || err);
-      document.getElementById('statusDot').classList.remove('online');
+      console.error("Erro MQTT:", err);
+      showTempMessage('msg', 'Erro de conexão MQTT', 3000);
     });
 
     client.on('message', (topic, message) => {
       setOnline();
-      const msg = message.toString();
+      const payload = message.toString();
+      console.log(topic, payload);
 
       if (topic === topicStatus) {
         try {
-          const data = JSON.parse(msg);
+          const data = JSON.parse(payload);
           if (data.waterTankLevel !== undefined) updateBar('waterTankLevel', data.waterTankLevel);
           if (data.reservoirLevel !== undefined) updateBar('reservoirLevel', data.reservoirLevel);
           if (data.pumpStatus !== undefined) updateStatus('pumpStatus', data.pumpStatus);
           if (data.deviceStatus !== undefined) updateStatus('deviceStatus', data.deviceStatus);
         } catch (e) {
-          console.error('Erro ao parsear mensagem de status:', e);
+          console.error("JSON inválido no status:", e);
         }
       }
-
       if (topic === topicTrigger) {
-        let val = parseInt(msg);
-        if (!isNaN(val)) {
-          document.getElementById('selector').value = (val >= 99 ? 99 : val);
-        }
+        let val = parseInt(payload, 10);
+        if (isNaN(val)) val = 25;
+        document.getElementById('selector').value = (val >= 99 ? 99 : val);
       }
     });
 
@@ -189,38 +195,35 @@
       if (client.connected) {
         client.publish(topicCmd, cmd);
         vibrateDevice();
-        showTempMessage('msg', cmd.includes('on') ? 'Ligando...' : 'Desligando...', 2000);
-
         if (statusId) {
-          const el = document.getElementById(statusId);
-          el.innerText = state ? 'Ligado' : 'Desligado';
-          el.style.color = state ? '#00ff88' : '#ff4444';
+          updateStatus(statusId, state);
         }
+        showTempMessage('msg', 'Comando enviado!', 1500);
       } else {
-        showTempMessage('msg', 'Sem conexão com o dispositivo!', 3000);
+        showTempMessage('msg', 'Sem conexão MQTT', 3000);
       }
     }
 
     function saveValue() {
-      if (client.connected) {
-        const val = document.getElementById('selector').value;
-        client.publish(topicCmd, 'trigger:' + val);
-        vibrateDevice();
-        showTempMessage('saveMsg', 'Configuração salva!', 2000);
-      } else {
-        showTempMessage('saveMsg', 'Sem conexão com o dispositivo!', 3000);
+      if (!client.connected) {
+        showTempMessage('saveMsg', 'Sem conexão!', 3000);
+        return;
       }
+      const val = document.getElementById('selector').value;
+      client.publish(topicCmd, `trigger:${val}`);
+      vibrateDevice();
+      showTempMessage('saveMsg', 'Salvo!', 2000);
     }
 
-    function vibrateDevice() {
-      if ("vibrate" in navigator) navigator.vibrate(50);
+    function vibrateDevice() { 
+      if ("vibrate" in navigator) navigator.vibrate(50); 
     }
 
     function showTempMessage(id, text, time = 2000) {
       const el = document.getElementById(id);
       el.innerText = text;
       el.style.display = 'block';
-      setTimeout(() => { el.style.display = 'none'; el.innerText = ''; }, time);
+      setTimeout(() => el.style.display = 'none', time);
     }
 
     function updateBar(id, v) {
