@@ -68,6 +68,7 @@
     <h1>Controle de Abastecimento</h1>
     <div id="statusDot" class="status-dot"></div>
   </div>
+
   <div class="card">
     <h2>Níveis de Reservatório</h2>
     <p>Caixa d'Água</p>
@@ -75,7 +76,9 @@
     <p>Reservatório</p>
     <div class="bar"><div id="reservoirLevel" class="fill">0%</div></div>
   </div>
+
   <p style="font-size:14px;">Obs: O reservatório precisa estar acima<br>de 25% para acionamento automático</p>
+
   <div class="card">
     <h2>Bomba Automática</h2>
     <p>Nível para ligar automaticamente</p>
@@ -91,6 +94,7 @@
     </div>
     <p id="saveMsg" class="status-text"></p>
   </div>
+
   <div class="card">
     <h2>Bomba Manual</h2>
     <button class="button on" onclick="sendCommand('pump:on', true)">Ligar</button>
@@ -98,6 +102,7 @@
     <p id="msg" class="status-text"></p>
     <p id="pumpStatus" class="status-text" style="color:#ff4444">Desligado</p>
   </div>
+
   <div class="card">
     <h2>Dispositivo Paralelo</h2>
     <button class="button on" onclick="sendCommand('device:on', true, 'deviceStatus')">Ligar</button>
