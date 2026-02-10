@@ -117,7 +117,6 @@
     const topicStatus = `${base}/status`;
     const topicTrigger = `${base}/trigger`;
 
-    // Broker privado com WebSocket seguro
     const mqttBroker = 'wss://u4182f38.ala.us-east-1.emqxsl.com:8084/mqtt';
     const options = {
       clientId: 'web_' + Math.random().toString(16).substr(2, 8),
@@ -126,22 +125,28 @@
       keepalive: 30,
       reconnectPeriod: 3000,
       clean: true,
-      // Descomente abaixo SE o certificado der erro no browser (inseguro, use apenas para teste!)
-      // rejectUnauthorized: false
+      // rejectUnauthorized: false  // descomente apenas se necessário para teste
     };
 
     const client = mqtt.connect(mqttBroker, options);
     let lastMessageTime = 0;
-    const TIMEOUT = 15000; // 15 segundos sem mensagem → vermelho
+    const TIMEOUT = 15000;
+    let isConnected = false;  // ← Nova variável para controle mais preciso
 
     function setOnline() {
       document.getElementById('statusDot').classList.add('online');
       lastMessageTime = Date.now();
+      isConnected = true;
+    }
+
+    function setOffline() {
+      document.getElementById('statusDot').classList.remove('online');
+      isConnected = false;
     }
 
     function checkStatus() {
       if (Date.now() - lastMessageTime > TIMEOUT) {
-        document.getElementById('statusDot').classList.remove('online');
+        setOffline();
       }
     }
 
@@ -154,9 +159,15 @@
       setOnline();
     });
 
+    client.on('close', () => {
+      console.log("Conexão MQTT fechada");
+      setOffline();
+    });
+
     client.on('error', (err) => {
       console.error("Erro MQTT:", err);
       showTempMessage('msg', 'Erro de conexão MQTT', 3000);
+      setOffline();
     });
 
     client.on('message', (topic, message) => {
@@ -182,12 +193,9 @@
     });
 
     function sendCommand(cmd, state, statusId = 'pumpStatus') {
-      if (client.connected) {
+      if (isConnected) {
         client.publish(topicCmd, cmd);
         vibrateDevice();
-        //if (statusId) {
-        //  updateStatus(statusId, state);
-        //}
         showTempMessage('msg', 'Comando enviado!', 1500);
       } else {
         showTempMessage('msg', 'Sistema desconectado', 3000);
@@ -195,7 +203,7 @@
     }
 
     function saveValue() {
-      if (!client.connected) {
+      if (!isConnected) {
         showTempMessage('saveMsg', 'Sistema desconectado', 3000);
         return;
       }
