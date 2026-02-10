@@ -195,9 +195,9 @@
       if (client.connected) {
         client.publish(topicCmd, cmd);
         vibrateDevice();
-        if (statusId) {
-          updateStatus(statusId, state);
-        }
+        //if (statusId) {
+          //updateStatus(statusId, state);
+       // }
         showTempMessage('msg', 'Comando enviado!', 1500);
       } else {
         showTempMessage('msg', 'Sem conexão MQTT', 3000);
