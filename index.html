@@ -158,6 +158,7 @@
       console.log("MQTT WebSocket conectado!");
       client.subscribe([topicStatus, topicTrigger], (err) => {
         if (!err) console.log("Subscrito com sucesso");
+        client.publish(topicCmd, "get_trigger");
       });
       setInterval(checkStatus, 5000);
       setOnline();
