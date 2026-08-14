@@ -206,22 +206,26 @@
 
       // Status completo (contém o campo locked)
       if (topic === topicStatus) {
-        try {
-          const data = JSON.parse(payload);
+  try {
+    const data = JSON.parse(payload);
 
-          if (data.locked !== undefined) {
-            updateLockedUI(data.locked === true || data.locked === "true");
-          }
+    if (data.locked !== undefined) {
+      updateLockedUI(data.locked === true || data.locked === "true");
+    }
 
-          if (data.waterTankLevel !== undefined) updateBar('waterTankLevel', data.waterTankLevel);
-          if (data.reservoirLevel !== undefined) updateBar('reservoirLevel', data.reservoirLevel);
-          if (data.pumpStatus !== undefined) updateStatus('pumpStatus', data.pumpStatus);
-          if (data.deviceStatus !== undefined) updateStatus('deviceStatus', data.deviceStatus);
-        } catch (e) {
-          console.error("JSON inválido no status:", e);
-        }
-      }
+    if (data.waterTankLevel !== undefined) updateBar('waterTankLevel', data.waterTankLevel);
+    if (data.reservoirLevel !== undefined) updateBar('reservoirLevel', data.reservoirLevel);
+    if (data.pumpStatus !== undefined) updateStatus('pumpStatus', data.pumpStatus);
+    if (data.deviceStatus !== undefined) updateStatus('deviceStatus', data.deviceStatus);
 
+    // ===== Mensagens de bloqueio da bomba =====
+    if (data.Msg) {
+      showTempMessage('msg', data.Msg, 3000);
+    }
+  } catch (e) {
+    console.error("JSON inválido no status:", e);
+  }
+}
       // Tópico específico de trava (mais rápido)
       if (topic === topicLocked) {
         updateLockedUI(payload === "1" || payload === "true");
