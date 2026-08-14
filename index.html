@@ -25,16 +25,6 @@
     }
     .header img { width: 40px; height: 40px; }
     h1 { font-size: 20px; margin: 0; }
-    .status-dot {
-      width: 10px; height: 10px; border-radius: 50%; background: #ff4444;
-      box-shadow: 0 0 10px #ff4444; animation: pulse-red 2s infinite;
-    }
-    .online {
-      background: #00ff88 !important; box-shadow: 0 0 15px #00ff88 !important;
-      animation: pulse-green 2s infinite !important;
-    }
-    @keyframes pulse-red { 0%,100% { opacity: 0.7; } 50% { opacity: 1; } }
-    @keyframes pulse-green { 0%,100% { opacity: 0.8; } 50% { opacity: 1; } }
     .card {
       background: rgba(51,51,51,0.7); padding: 20px; margin: 15px auto;
       border-radius: 15px; width: 90%; max-width: 400px;
@@ -85,7 +75,7 @@
 </head>
 <body>
 
-  <!-- Tela de bloqueio (aparece quando deviceLocked = true) -->
+  <!-- Tela de bloqueio -->
   <div id="lockedScreen">
     <h1>Entre em contato com a BenTech</h1>
   </div>
@@ -95,8 +85,8 @@
     <div class="header">
       <img src="https://davidbehn.github.io/bentech-assets/logo.png" alt="BenTech">
       <h1>Controle de Abastecimento</h1>
-<div id="statusDot" class="status-dot"></div>
     </div>
+
     <div class="card">
       <h2>Níveis de Reservatório</h2>
       <p>Caixa d'Água</p>
@@ -104,7 +94,9 @@
       <p>Reservatório</p>
       <div class="bar"><div id="reservoirLevel" class="fill">0%</div></div>
     </div>
+
     <p style="font-size:14px;">Obs: O reservatório precisa estar acima<br>de 25% para acionamento automático</p>
+
     <div class="card">
       <h2>Bomba Automática</h2>
       <p>Nível para ligar automaticamente</p>
@@ -120,6 +112,7 @@
       </div>
       <p id="saveMsg" class="status-text"></p>
     </div>
+
     <div class="card">
       <h2>Bomba Manual</h2>
       <button class="button on" onclick="sendCommand('pump:on', true)">Ligar</button>
@@ -127,6 +120,7 @@
       <p id="msg" class="status-text"></p>
       <p id="pumpStatus" class="status-text" style="color:#ff4444">Desligado</p>
     </div>
+
     <div class="card">
       <h2>Dispositivo Paralelo</h2>
       <button class="button on" onclick="sendCommand('device:on', true, 'deviceStatus')">Ligar</button>
@@ -141,7 +135,7 @@
     const topicCmd = `${base}/cmd`;
     const topicStatus = `${base}/status`;
     const topicTrigger = `${base}/trigger`;
-    const topicLocked = `${base}/locked`;   // ← tópico de trava
+    const topicLocked = `${base}/locked`;
 
     const mqttBroker = 'wss://u4182f38.ala.us-east-1.emqxsl.com:8084/mqtt';
     const options = {
@@ -154,20 +148,7 @@
     };
 
     const client = mqtt.connect(mqttBroker, options);
-    let lastMessageTime = 0;
-    const TIMEOUT = 15000;
     let isLocked = false;
-
-    function setOnline() {
-      document.getElementById('statusDot').classList.add('online');
-      lastMessageTime = Date.now();
-    }
-
-    function checkStatus() {
-      if (Date.now() - lastMessageTime > TIMEOUT) {
-        document.getElementById('statusDot').classList.remove('online');
-      }
-    }
 
     // ===== Controla a tela de bloqueio =====
     function updateLockedUI(locked) {
@@ -190,8 +171,6 @@
         if (!err) console.log("Subscrito com sucesso");
         client.publish(topicCmd, "get_trigger");
       });
-      setInterval(checkStatus, 5000);
-      setOnline();
     });
 
     client.on('error', (err) => {
@@ -200,33 +179,32 @@
     });
 
     client.on('message', (topic, message) => {
-      setOnline();
       const payload = message.toString();
       console.log(topic, payload);
 
-      // Status completo (contém o campo locked)
+      // Status completo
       if (topic === topicStatus) {
-  try {
-    const data = JSON.parse(payload);
+        try {
+          const data = JSON.parse(payload);
 
-    if (data.locked !== undefined) {
-      updateLockedUI(data.locked === true || data.locked === "true");
-    }
+          if (data.locked !== undefined) {
+            updateLockedUI(data.locked === true || data.locked === "true");
+          }
+          if (data.waterTankLevel !== undefined) updateBar('waterTankLevel', data.waterTankLevel);
+          if (data.reservoirLevel !== undefined) updateBar('reservoirLevel', data.reservoirLevel);
+          if (data.pumpStatus !== undefined) updateStatus('pumpStatus', data.pumpStatus);
+          if (data.deviceStatus !== undefined) updateStatus('deviceStatus', data.deviceStatus);
 
-    if (data.waterTankLevel !== undefined) updateBar('waterTankLevel', data.waterTankLevel);
-    if (data.reservoirLevel !== undefined) updateBar('reservoirLevel', data.reservoirLevel);
-    if (data.pumpStatus !== undefined) updateStatus('pumpStatus', data.pumpStatus);
-    if (data.deviceStatus !== undefined) updateStatus('deviceStatus', data.deviceStatus);
+          // Mensagens de bloqueio da bomba
+          if (data.Msg) {
+            showTempMessage('msg', data.Msg, 3000);
+          }
+        } catch (e) {
+          console.error("JSON inválido no status:", e);
+        }
+      }
 
-    // ===== Mensagens de bloqueio da bomba =====
-    if (data.Msg) {
-      showTempMessage('msg', data.Msg, 3000);
-    }
-  } catch (e) {
-    console.error("JSON inválido no status:", e);
-  }
-}
-      // Tópico específico de trava (mais rápido)
+      // Tópico específico de trava
       if (topic === topicLocked) {
         updateLockedUI(payload === "1" || payload === "true");
       }
